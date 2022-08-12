@@ -1,4 +1,4 @@
-# Copyright 2021-22 Toyota Research Institute.  All rights reserved. [https://github.com/TRI-ML/DDAD](https://github.com/ToyotaResearchInstitute/tristan)
+# Copyright 2021-22 Toyota Research Institute.  All rights reserved. [https://github.com/ToyotaResearchInstitute/tristan](https://github.com/ToyotaResearchInstitute/tristan)
 
 This work is licensed under a
 Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
