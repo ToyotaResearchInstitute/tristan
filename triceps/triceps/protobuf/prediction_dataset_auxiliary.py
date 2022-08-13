@@ -49,7 +49,6 @@ def compute_hash(string: str) -> str:
     return hashlib.md5(string.encode()).hexdigest()
 
 
-# TODO(guy.rosman): create a parent class for image_processor_wrapper and use it in the typing of PA_Wrapper.
 class ImageProcessor(object):
     """Pre-processes an image -- e.g. with PA or similar. Stub class to be implemented."""
 
@@ -83,7 +82,6 @@ class ImageProcessor(object):
         result : array
           1xD result array
         """
-        # TODO: Move bboxes into the ImageProcessor.
         result, full_prediction = self.image_processor_wrapper._process_impl(img, bboxes)
         assert result.shape[1] == self.output_dim
         return result
@@ -365,7 +363,6 @@ def interpolate_trajectory(positions, timestamps, params, k, visualization_filen
     positions = positions[is_valid, :]
     timestamps = timestamps[is_valid]
     minimum_timestamps_len = 2
-    # TODO(guy.rosman) Add: if the whole trajectory is invalid, return critically too short.
     positions_no_dup, timestamps_no_dup = remove_duplicate_points(positions, timestamps)
     positions_trunc, timestamps_trunc = truncate_timespan(
         positions_no_dup, timestamps_no_dup, past_timesteps, future_timesteps, past_dt, future_dt
@@ -488,7 +485,6 @@ def interpolate_trajectory(positions, timestamps, params, k, visualization_filen
     if max_excursion > params["interpolation_excursion_threshold"]:
         visualize_subfolder = "inaccurate"
         is_inaccurate = True
-        # TODO(guy.rosman): move to a logger / log somewhere the statistics of excursions.
         if log_interp_excursions:
             print("excursion: {}, {}".format(max_excursion, k))
     else:
@@ -925,7 +921,6 @@ def select_agent(
         new_trajectories = [trajectories[new_idx]]
         new_additional_types = [additional_inputs[new_idx]]
 
-    # TODO replace with unit test
     assert len(new_is_ego) == params[protobuf_training_parameter_names.PARAM_MAX_AGENTS]
     assert len(new_is_rel) == params[protobuf_training_parameter_names.PARAM_MAX_AGENTS]
     assert len(new_dot_keys) == params[protobuf_training_parameter_names.PARAM_MAX_AGENTS]
@@ -1193,7 +1188,6 @@ def read_sensor_image(
                         )
                         print("img_path2", img_path)
 
-                        # TODO(guy.rosman) is this missing
                         err_str = (
                             "Trying to load image, but missing img folder {} for img {}. Filename: {}, "
                             "If images are not needed, set --scene-image-mode=none.".format(
@@ -1216,7 +1210,6 @@ def read_sensor_image(
                                     height = int(crop[3])
                                     width = int(crop[2])
                                 except OverflowError as err:
-                                    # TODO(guy.rosman): Check if we still get overflow errors. Remove if not needed.
                                     import IPython
 
                                     IPython.embed(header=str([err, filename, index]))
@@ -1240,13 +1233,11 @@ def read_sensor_image(
 
                         IPython.embed()
             else:
-                # TODO(guy.rosman) is this missing
                 raise Exception("Missing img folder, yet images are loaded. Set --scene-image-mode=none.")
             if not type(img).__name__ == "ndarray":
                 img = img.numpy()
             cache.save(img.transpose([1, 2, 0]) * 255)
     elif "rawData" in inp["sensorImageInput"]:
-        # TODO(guy.rosman): implement Usage for a specific type once there's data to test on.
         raw_data = inp["sensorImageInput"]["rawData"]["data"]
         data_img_width = inp["sensorImageInput"]["rawData"]["width"]
         data_img_height = inp["sensorImageInput"]["rawData"]["height"]
@@ -1434,7 +1425,6 @@ class GlobalImageHandler(ImageHandler):
                     )
 
                     if params["use_scene_semantic_masks"]:
-                        # TODO(nicholas.guyett.ctr) Can we de-duplicate this between scene and agent images?
                         semantic_mask, _ = read_sensor_image(
                             inp,
                             params,
@@ -1495,9 +1485,6 @@ class AgentImageHandler(ImageHandler):
         Additional custom image processing routines.
     """
 
-    # TODO(igor.gilitschenski): Currently, we inject some of the command line parameters as arguments to the constructor
-    # TODO  whereas others are used as part of the params dictionary in process(). This is inconsistent and we
-    # TODO  should unify it for all handlers.
     def __init__(
         self,
         params,
@@ -1613,7 +1600,6 @@ class AgentImageHandler(ImageHandler):
             prediction_timestamp = result_dict[ProtobufPredictionDataset.DATASET_KEY_PREDICTION_TIMESTAMP]
 
             # get bounding box information from additional inputs of the relevant agent
-            # TODO(rui.yu) support multiple sequences of bounding boxes (multiple relevant agents)
             bboxes = {}
             for k, additional_inputs in zip(
                 result_dict[ProtobufPredictionDataset.DATASET_KEY_DOT_KEYS],
@@ -1678,8 +1664,6 @@ class AgentImageHandler(ImageHandler):
                             bboxes[k], timestamps_bbox, new_timestamps_img, params["bbox_dilate_scale"]
                         )
 
-                    # TODO(igor.gilitschenski): Check if this is the right location for cnt or if it should be inside
-                    # TODO the for loop.This seems to be unproblematic for now as we only have one agent image per scene
                     cnt = 0
                     for agent_key in new_bboxes:
                         for i, inp_i in enumerate(idx_images):
@@ -1716,7 +1700,6 @@ class AgentImageHandler(ImageHandler):
                             )
 
                             if params["use_agent_semantic_masks"]:
-                                # TODO(nicholas.guyett.ctr) Can we de-duplicate this between scene and agent images?
                                 mask_crop = new_bboxes[agent_key][i, :]
 
                                 if params["agent_semantic_mask_padding_ratio"]:
@@ -1966,7 +1949,6 @@ class HeadingHandler(InputsHandler):
                     heading_k.append([0.0, 0.0, 0.0, 0.0, 0.0])
             heading_list.append(heading_k)
 
-        # TODO(nbuckman): allow for self.transpose_agent_time=False
         headings = np.array(heading_list).transpose(1, 0, 2)
 
         agent_idx_full = result_dict[ProtobufPredictionDataset.DATASET_KEY_AGENT_IDX]

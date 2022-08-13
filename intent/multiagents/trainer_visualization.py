@@ -1010,7 +1010,6 @@ def visualize_label_accuracy(
 
         IPython.embed(header="failed to read latent_factors_file")
 
-    # TODO(rui.yu): standardize the time segments
     time_segments = [(-0.5, 0.5), (0, 1), (1, 2)]
     num_label_types = all_semantic_labels.shape[1]
     prediction_accuracy = {}

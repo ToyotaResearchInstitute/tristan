@@ -75,23 +75,18 @@ def create_normalizing_pose(track, future_length, velocity_threshold=4.0):
     :param track: contains 'position_L','heading_L'
     :return: R,t, a normalizing transform.
     """
-    # TODO: add code in case heading is not None's
-    # TODO: decide which reference point to use
     if len(track["position_L"]) <= future_length:
         return None
     pos1 = track["position_L"][-future_length]
 
     # otherwise, throw away the example - rotation/pose is unclear.
-    # TODO: use heading
     for i in range(len(track["position_L"]) - 1):
         pos0 = track["position_L"][-i - 1]
-        # TODO: better estimate
         velocity_v = np.array(pos1) - np.array(pos0)
         if np.linalg.norm(velocity_v) > velocity_threshold:
             break
     if np.linalg.norm(velocity_v) < velocity_threshold:
         return None
-    # TODO: check if adovehicle headers are stable when they are available..
     # if not track['heading_L'][0] is None:
     #     R=[[np.cos(track['heading_L'][0]),np.sin(track['heading_L'][0])],[-np.sin(track['heading_L'][0]),np.cos(track['heading_L'][0])]]
     #     R=np.array(R)

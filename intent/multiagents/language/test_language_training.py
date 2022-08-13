@@ -127,7 +127,6 @@ class TestLanguageTrainingPipeline(unittest.TestCase):
             params_original["data_debug_mode"] = generate_synthetic_data
         params_original["agent_types"] = DEFAULT_AGENT_TYPES
 
-        # TODO(guy.rosman): standardize case of type arguments such as latent_factors_type, interp type, etc.
         # Add latent factors usage
         full_param = copy.deepcopy(params_original)
         full_param = add_latent_factors(full_param)

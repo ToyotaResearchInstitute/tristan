@@ -6,7 +6,6 @@ import torch
 from torch.utils.data import Dataset
 
 
-# TODO(guy.rosman): consolidate with other statistics functions, e.g. KLD.
 def compute_mean_variances(
     data: torch.Tensor, diagonal_term_coefficient: float = 1e-8
 ) -> Tuple[torch.Tensor, torch.Tensor]:

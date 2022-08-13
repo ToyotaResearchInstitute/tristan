@@ -192,7 +192,6 @@ def create_polynomial_features(ln_coords, horizon=2, stepsize=0.5, degree=3):
         sampled_positions = [ln_polyline.interpolate(o).xy for o in offsets]
         sampled_positions = np.array(sampled_positions).squeeze(2)
         A.append(sampled_positions)
-        # TODO(guy.rosman): replace the end with a linear extrapolation
         ln_coords_shifted = ln_coords_shifted[1:] + [ln_coords_shifted[-1]]
     A = np.array(A)
     dim = 2
@@ -298,11 +297,9 @@ class PointMapHandler(InputsHandler):
             all_tangent_vectors: list to be appended to, of local features. Currently: cos, sin of the tangent at that point.
 
             """
-            # TODO(guy.rosman): Update the name of all_tangent_vectors once it has something other than tangents.
             tangent_vectors = [
                 [elem1[0] - elem2[0], elem1[1] - elem2[1]] for elem1, elem2 in zip(ln_coords[1:], ln_coords[:-1])
             ]
-            # TODO(guy.rosman): turn on polynomial features, optimize/cache them, use them.
             normal_vectors = [
                 [elem1[1] - elem2[1], elem2[0] - elem1[0]] for elem1, elem2 in zip(ln_coords[1:], ln_coords[:-1])
             ]
@@ -483,7 +480,6 @@ class PointMapHandler(InputsHandler):
                     [segments[-1]["end"]["x"], segments[-1]["end"]["y"]],
                     [segments[0]["start"]["x"], segments[0]["start"]["y"]],
                 ]
-                # TODO(cyrushx): Replace type with Waymo types.
                 update_map(
                     ln_coords,
                     MapPointType.CENTER_LANE_LINE,
@@ -559,7 +555,6 @@ def normalize_agent_additional_inputs(agent_additional_inputs, transforms, shoul
         # Rotate positions.
         normalized_map_data[..., :2] = torch.matmul(normalized_map_data[..., :2], transforms[:, :, :2])
         # Rotate angles.
-        # TODO(guy.rosman) use an update function once we switched to more general features.
         tangent_slice = slice(MapDataIndices.MAP_IDX_TANGENT, (MapDataIndices.MAP_IDX_TANGENT + 2))
         normalized_map_data[..., tangent_slice] = apply_2d_coordinate_rotation_transform(
             transforms[:, :, :2],
@@ -602,8 +597,6 @@ def add_polynomial_features(agent_additional_inputs, transforms=None, should_nor
     map_validity = map_validity.view(-1, num_point_per_element).cpu().detach().numpy()
     polynomial_degree = params["map_polyline_feature_degree"]
     polynomial_features = torch.zeros(map_validity.shape[0], num_point_per_element, polynomial_degree * 2)
-    # TODO(cyrushx): Is there a way to compute poly coeffs directly in tensors?
-    # TODO(cyrushx): The computation is expensive. Need to speed up.
     for i in range(map_coordinates.shape[0]):
         validity = map_validity[i]
         if np.sum(validity) > 1:
@@ -615,7 +608,6 @@ def add_polynomial_features(agent_additional_inputs, transforms=None, should_nor
             ln_coords_hash = sha.hexdigest()
 
             cache_id = "map_poly_" + ln_coords_hash + "_" + str(polynomial_degree)
-            # TODO(xiongyi) Remove caching this handler, it should be captured by main cache.
             cache_poly = CacheElement(params["cache_dir"], cache_id, "pkl", disable_cache=params["disable_cache"])
             if cache_poly.is_cached():
                 poly_feature = np.array(cache_poly.load())
@@ -624,7 +616,6 @@ def add_polynomial_features(agent_additional_inputs, transforms=None, should_nor
                 poly_feature = create_polynomial_features(ln_coords.tolist(), degree=polynomial_degree).T
                 cache_poly.save(poly_feature.tolist())
             polynomial_features[i, : ln_coords.shape[0]] = torch.from_numpy(poly_feature)
-    # TODO(cyrushx): Add a constant for the index of the polynomial features.
     polynomial_features = polynomial_features.view(batch_size, num_agent, num_map_elements, num_point_per_element, -1)
     polynomial_features = polynomial_features.to(map_data.device)
     agent_additional_inputs["map"] = torch.cat((map_data, polynomial_features), -1)

@@ -315,7 +315,6 @@ def latent_factors_argument_setter(parser):
         default=f"{repo_base}/intent/multiagents/latent_factors_subset.json",
         help="Definitions file for latent factors.",
     )
-    # TODO(guy.rosman): should this move to the general arg setter?
     parser.add_argument("--use-latent-factors", type=str2bool, default="true", help="Use latent factors in prediction.")
     parser.add_argument("--use-semantics", type=str2bool, default="false", help="Use semantics in prediction.")
     # turned on for this case.
@@ -342,7 +341,6 @@ def add_latent_factors(params):
     :return:
     """
     assert "latent_factors_keys" not in params, "add_latent_factors() been called twice"
-    # TODO (xiongyi.cui) Remove dependency on latent factors, to another file maybe.
     latent_factors_type = params["latent_factors_type"].lower()
     if latent_factors_type == "const":
         latent_factors_keys = ["1", "2", "3"]

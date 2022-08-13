@@ -38,7 +38,6 @@ if __name__ == "__main__":
 
     params_original = set_agent_types(params_original)
 
-    # TODO(guy.rosman): standardize case of type arguments such as latent_factors_type, interp type, etc.
     # Add latent factors usage
     full_param = copy.deepcopy(params_original)
     full_param = add_latent_factors(full_param)

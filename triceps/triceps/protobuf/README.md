@@ -6,7 +6,6 @@
 * DGL
 * protobuf
 
-(TODO: create conda yml)
 
 To run - synthetic data generation (constant velocity multiagent generation -> protobuf -> train GNN with data reader):
 

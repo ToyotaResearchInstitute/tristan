@@ -132,7 +132,6 @@ class IntentOSM:
                 [osm_id0, easting0, northing0, zone_number0, zone_letter0],
             )
             self.conn_db.commit()
-            # TODO: Execute the bounds.lua command
 
         return min_id, (easting0, northing0, zone_number0, zone_letter0)
 
@@ -148,7 +147,6 @@ class IntentOSM:
         # If within 20 meters...
         if dist > threshold:
             return False, osm_id
-        # TODO: Get some data about the point?
         # ref, props = list(self.osm_intersections[osm_id].items())[intersection_id]
         # print("Close to intersection", ref)
         # pprint(props)

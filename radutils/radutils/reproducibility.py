@@ -125,7 +125,6 @@ class RunManifest:
         }
 
         if self.random_state:
-            # TODO(nicholas.guyett.ctr) Is this overkill?
             result["random_state"] = self.random_state
 
         if self.wandb_results_link:

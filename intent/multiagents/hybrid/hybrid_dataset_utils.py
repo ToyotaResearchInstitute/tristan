@@ -42,14 +42,12 @@ def generate_hybrid_synthetic_data(
 
     timestamps = np.linspace(0, max_timesteps - 1, max_timesteps)
     prediction_timestamp = params["past_timesteps"]
-    # TODO(cyrushx): Add noise to positions.
     positions = np.random.normal(size=[max_timesteps, max_agents, 2]) * 0.1
     validity = np.ones([max_timesteps, max_agents, 1])
     positions = np.concatenate((positions, validity), -1)
     modes = np.zeros([max_timesteps, max_agents])
 
     # Define three modes (forward, up, down) with different slopes.
-    # TODO(cyrushx): Change slope to see if the network can learn.
     mode_slopes = [0, 2.0, -1.0]
     num_modes = len(mode_slopes)
     # The transition is unbiased.

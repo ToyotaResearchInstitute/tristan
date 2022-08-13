@@ -55,7 +55,6 @@ class BatchGraphEncoder(nn.Module):
             if self.params["special_init"]:
                 nn.init.normal_(linear_net.bias, 0.0, 0.01)
                 nn.init.xavier_uniform_(linear_net.weight)
-            # TODO(guy.rosman) -- followup, see why BatchNorm is causing problems, check w/ Cyrus.
             # self.input_module = nn.Sequential(linear_net,nn.BatchNorm1d(node_hidden_dim))
             if self.use_layer_norm:
                 self.input_module = nn.Sequential(linear_net, nn.LayerNorm(node_hidden_dim), nn.ReLU())
@@ -64,7 +63,6 @@ class BatchGraphEncoder(nn.Module):
                     linear_net, nn.ReLU(), nn.Dropout(self.params["coordinate_encoder_dropout"])
                 )
         else:
-            # TODO(cyrushx): Fix BatchNorm1d in create_mlp
             self.input_module = create_mlp(
                 input_dim=2 * (input_dim + 1),
                 layers_dim=self.params["coordinate_encoder_widths"] + [node_hidden_dim],
@@ -208,7 +206,6 @@ class BatchGraphEncoder(nn.Module):
         normalized_trajectories = inputs["normalized_trajectories"]
         agent_type = inputs["agent_type"]
         is_valid = inputs["is_valid"]
-        # TODO(guy.rosman): check and if so remove.
         scene_data = inputs["scene_data"]
         agent_data = inputs["agent_data"]
         relevant_agents = inputs["relevant_agents"]
@@ -244,14 +241,12 @@ class BatchGraphEncoder(nn.Module):
         node_processed_agent_type = self.node_type_processor(agent_type)
         # reshaped_agent_data = agent_data.view(agent_data.shape[0] * agent_data.shape[1], agent_data.shape[2], agent_data.shape[3])
 
-        # TODO(guy.rosman): add per-agent agent data.
         if self.agent_dim > 0:
             # Batch and process agent state
             batched_processed_agent = self.agent_processor(agent_data)
             # Zero irrelevant agent states.
             batched_processed_agent = batched_processed_agent * relevant_agents[:, :, None, None].float()
 
-        # TODO(paul.drews): Encapsulate the phases of this loop to make reading easier.
         # Try to clean/batch the agent loop and remove run_on_4D.
         # Computation structure (where each node in the graph is an agent state at time t,
         # graph edges connect all agents within timestep t, LSTMs update agent states through time,
@@ -416,7 +411,6 @@ class BatchGraphEncoder(nn.Module):
             if t == self.temporal_truncated_steps:
                 self.edge_states[t] = self.edge_states[t].detach()
 
-                # ToDo(paul.drews): This needs to be fixed to use temporal_truncated_steps.
                 # for i in range(self.num_agents):
                 #     self.agent_states[i][t] = tuple([x.detach() for x in self.agent_states[i][t]])
 
@@ -475,5 +469,4 @@ class BatchGraphEncoder(nn.Module):
                 self.edge_module_indicies_j[edge_num, feature] = edge[1]
 
     def save_model(self, data, is_valid):
-        # TODO(guy.rosman): Implement using torch.jit.trace.
         pass

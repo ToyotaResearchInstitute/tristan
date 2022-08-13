@@ -12,7 +12,6 @@ from radutils.torch.torch_utils import (
 
 
 def create_rotation_matrix(angle_radians: float):
-    # TODO: Move to utility method
     cos_theta = cos(angle_radians)
     sin_theta = sin(angle_radians)
     return torch.tensor(

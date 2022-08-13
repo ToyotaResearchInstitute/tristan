@@ -197,7 +197,6 @@ def label_driving_mode_sequence(agent_traj, turn_threshold=2.0, vel_threshold=1.
 
     velocity = np.sqrt(np.sum((agent_traj[1:] - agent_traj[:-1]) ** 2, -1))
     velocity = np.hstack((velocity[:1], velocity))
-    # TODO(cyrushx): Use acceleration when it is not too noisy.
     acceleration = velocity[1:] - velocity[:-1]
     acceleration = np.hstack((acceleration, acceleration[-1:]))
     for i in range(traj_length):

@@ -87,12 +87,10 @@ python multiagents/train_pedestrian_trajectory_prediction.py --input-dir ~/inten
 ```
 Note: Waymo metrics computation only supports full time steps (past timesteps of 11 and future timesteps of 80).
 
-TODO(cyrushx): Update the script on training on full dataset, with 8 agents.
 ```
 python multiagents/train_pedestrian_trajectory_prediction.py --input-training-dir ~/intent/waymo/waymo_training_pb/ --input-validation-dir ~/intent/waymo/waymo_validation_pb/ --max-agents 8 --learning-rate 1e-3 --vis-interval 10 --scene-image-mode=none --agent-image-mode=none --past-timesteps 10 --future-timesteps 80 --past-timestep-size 0.1 --future-timestep-size 0.1 --num-visualization-images 20 --dropout 0.1 --child-network-dropout 0.0 --additional-dropout-ratio 0.2 --training-set-ratio 0.8 --batch-size 32 --epoch-size 2048 --raw-l2-for-mon --vis-num-workers 0 --l2-term-coeff 0.0 --augment-trajectories False --MoN-number-samples 6 --mon-term-coeff 1.0 --encoder-normalized-trajectory-only --disable-map-input --ignore-ego --use-waymo-dataset True --report-agent-type-metrics True --use-marginal-error True --use-mlp-decoder True --use-discriminator False --interp-type none --disable-label-weights --datasets-name-lists none --logger-type weights_and_biases
 ```
 
-Results for vehicle type (TODO: add miss rate and mAP):
 
 |    | minADE | minFDE |
 |----|--------|-------|

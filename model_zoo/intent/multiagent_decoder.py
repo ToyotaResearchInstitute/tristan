@@ -163,7 +163,6 @@ class AugmentedMultiAgentDecoder(nn.Module):
         for sample_index in sample_indices:
             inputs["sample_index"] = sample_index
             res_traj, joined_decoding, stats = self.decode(inputs)
-            # TODO: remove unsqueezes and verify use stack vs. cat in downstream uses.
             # List item shape: [B x num_agents x T x 2]
             results_list.append(res_traj)
             if joined_decoding is not None:
@@ -200,7 +199,6 @@ class AugmentedMultiAgentDecoder(nn.Module):
         List[dict]
             Additional statistics information.
         """
-        # TODO(cyrushx): Make the string a class constant string.
         intermediate_output = inputs["state_tuple_enc_last"]
         last_observed_position = inputs["last_position"]
         latent_factors = inputs["latent_factors"]
@@ -254,7 +252,6 @@ class AugmentedMultiAgentDecoder(nn.Module):
         # Predict for each future time step.
         for time_idx in range(self.num_timepoints):
 
-            # TODO(cyrushx): Can we skip the for loop for agents?
             # Predict trajectory sequence for each agent.
             for agent_i in range(self.num_agents):
                 if time_idx == 0:
@@ -268,7 +265,6 @@ class AugmentedMultiAgentDecoder(nn.Module):
                 # Obtain latent factors states.
                 if self.use_latent_factors:
                     # Generate initial latent factors before decoding
-                    # TODO(guy.rosman): merge w/ reset_generated_samples()
                     if time_idx == 0:
                         latent_factors_states[agent_i] = latent_factors.generate_initial_factors(
                             intermediate_output[agent_i][0], stats
@@ -323,7 +319,6 @@ class AugmentedMultiAgentDecoder(nn.Module):
                     sampled_values = OrderedDict()
                     if self.params["latent_factors_drop"]:
                         for key in self.latent_factors_keys:
-                            # TODO: make more efficient
                             sampled_values[key] = latent_factors.get_dimensionality(key)
                         augmented_list.append(
                             augmented_intermediate_output.new_zeros(batch_size, np.sum(list(sampled_values.values())))
@@ -389,7 +384,6 @@ class AugmentedMultiAgentDecoder(nn.Module):
         else:
             result = generated
 
-        # TODO(guy.rosman): move to update_stats.
         if latent_factors is not None:
             stats["cumulative_durations"] = {}
             if hasattr(latent_factors, "factor_names"):
@@ -424,5 +418,4 @@ class AugmentedMultiAgentDecoder(nn.Module):
         self.num_timepoints = num_timepoints
 
     def save_model(self, data, is_valid):
-        # TODO(guy.rosman): Implement using torch.jit.trace.
         pass

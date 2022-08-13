@@ -8,7 +8,6 @@ from torch.utils.data.dataset import T_co
 
 from loaders.ado_key_names import AGENT_TYPE_CAR, AGENT_TYPE_PEDESTRIAN
 
-# TODO add clarity to this type declaration
 synthetic_data_generator = Callable[[dict, int, int, int, list, str], dict]
 
 

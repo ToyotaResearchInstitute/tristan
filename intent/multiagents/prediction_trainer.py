@@ -164,7 +164,6 @@ def preprocess_batch_item(batch_item, params):
     # Read positions, validity, timestamps.
     # Scale down positions.
     batch_positions_tensor = batch_item[ProtobufPredictionDataset.DATASET_KEY_POSITIONS][:, :, :, :].float() * scale
-    # TODO(guy.rosman): GENERALIZATION - encapsulate reading of batch data items (inputs/outputs)
     batch_is_valid = batch_item[ProtobufPredictionDataset.DATASET_KEY_POSITIONS][:, :, :, 2]
     batch_timestamps_tensor = batch_item[ProtobufPredictionDataset.DATASET_KEY_TIMESTAMPS][:, :].float()
 
@@ -325,8 +324,6 @@ class PredictionProtobufTrainer:
         self.inference_mode = trainer_param.get("inference_mode", False)
         self.message_logger = TerminalMessageLogger()
 
-        # TODO(guy.rosman): make discriminator training optional - optimizers, schedulers.
-        # TODO(guy.rosman): Save model for tensorRT.
         assert "train" in datasets.keys()
         assert "validation" in datasets.keys()
         self.trainer_param = trainer_param
@@ -338,7 +335,6 @@ class PredictionProtobufTrainer:
             self.prediction_model = nn.DataParallel(self.prediction_model)
 
         # Flags for model configurations.
-        # TODO(mark.flanagan.ctr): handle this logic while parsing parameters
         self.use_discriminator = trainer_param["use_discriminator"] and not trainer_param.get("use_linear_model")
         self.use_semantics = trainer_param["use_semantics"]
         self.use_latent_factors = trainer_param["use_latent_factors"]
@@ -450,8 +446,6 @@ class PredictionProtobufTrainer:
                     self.trainer_param, self.device.type, session_name=self.tf_session_name
                 )
 
-            # TODO(igor.gilitschenski): This is basically a hack to determine whether we are in evaluation or training
-            # TODO  mode.
             self.worst_cases_folder = None
         else:
             self.worst_cases_folder = self.trainer_param["runner_output_folder"]
@@ -509,16 +503,12 @@ class PredictionProtobufTrainer:
         self.debugger = debugger
 
     def init_dataloaders(self):
-        # TODO(guy.rosman): GENERALIZATION - allow adding other dataloaders into the OrderedDict(), such as test set,
-        # TODO  datasets for additional cost terms, etc.
         dataloaders_info = OrderedDict()
 
         evaluation_dataset = self.trainer_param.get("evaluation_dataset", None)
         train_only = evaluation_dataset == "train"
         validation_only = evaluation_dataset == "validation"
 
-        # TODO(guy.rosman): GENERALIZATION - think how to encapsulate inference mode -- also maybe encapsulate data loop
-        # TODO  for inference, training, etc.
         if self.inference_mode:
             assert not self.trainer_param["disable_validation"], "Cannot disable validation in inference mode"
 
@@ -702,11 +692,9 @@ class PredictionProtobufTrainer:
         batch_itm : dict
             The dataloader dictionary
         """
-        # TODO(guy.rosman): Fix augmentation for map inputs
         _, num_agents, num_timestamps, _ = batch_itm[ProtobufPredictionDataset.DATASET_KEY_POSITIONS].shape
 
         # Augment trajectories by rotation.
-        # TODO(guy.rosman): move to function.
         augmentation_angles = batch_itm[ProtobufPredictionDataset.DATASET_KEY_POSITIONS][:, 0, 0, 0].clone()
         augmentation_angles.uniform_()
         augmentation_angles -= 0.5
@@ -811,7 +799,6 @@ class PredictionProtobufTrainer:
             with open(samples_save_fname, "wb") as pbfile:
                 pbfile.write(save_sample.SerializeToString())
 
-        # TODO(guy.rosman): Verify the format before removing this .embed()
         import IPython
 
         IPython.embed(header="save results -- this is a temporary specification, should verify")
@@ -924,7 +911,6 @@ class PredictionProtobufTrainer:
                 self.p_latent_factors_copy = new_p_latent_factors_copy
                 averages["avg_latent_factors_residual"] += latent_factors_residual
 
-        # TODO(guy.rosman): add input encoder multitask costs logging
         averages["avg_g_cost"] += g_cost.detach().cpu().item()
 
     def optimize_discriminator(self, d_cost, averages):
@@ -965,7 +951,6 @@ class PredictionProtobufTrainer:
                         [p.view(-1).unsqueeze(0).detach().cpu().numpy() for p in module.parameters()], 1
                     )
                     self.p_d_inputs_encoders_copy[key] = param_vec
-            # TODO(guy.rosman): GENERALIZATION - encapsulate optimization into a method
             if not self.trainer_param["disable_optimization"]:
                 d_cost.backward()
                 if self.trainer_param["clip_gradients"]:
@@ -1179,13 +1164,11 @@ class PredictionProtobufTrainer:
 
         statistic_keys = self.get_statistics_keys()
 
-        # TODO(guy.rosman): GENERALIZATION - encapsulate GAN functionality
         if self.g_optimizer is not None:
             self.g_optimizer.zero_grad(set_to_none=True)
         if self.use_discriminator and self.d_optimizer:
             self.d_optimizer.zero_grad(set_to_none=True)
 
-        # TODO(guy.rosman): GENERALIZATION - encapsulate logging handlers, unify the 2 types of logging handlers.
         for logging_handler in additional_logging_handlers:
             logging_handler.initialize_training(self.logger)
         # Create dictionary of LogWorstCases handlers for ease of access during training.
@@ -1201,8 +1184,6 @@ class PredictionProtobufTrainer:
             self.debugger.record_value("model_state", self.nondistributed_prediction_model.state_dict())
         self.training_start_time = datetime.datetime.now()
         for epoch in tqdm_iter:
-            # TODO(guy.rosman): GENERALIZATION - encapsulate residual computation
-            # TODO(guy.rosman): GENERALIZATION - encapsulate statistics
             if self.trainer_param["disable_tqdm"]:
                 print("epoch: ", epoch)
 
@@ -1353,9 +1334,7 @@ class PredictionProtobufTrainer:
                         d_cost = 0
                     # Global position scale.
                     scale = self.trainer_param["predictor_normalization_scale"]
-                    # TODO(guy.rosman): GENERALIZATION - encapsulate all normalizations
                     if self.trainer_param["augment_trajectories"] and dataloader_type == "train":
-                        # TODO(guy.rosman): GENERALIZATION - make augmentation modifiable / a functor
                         self.augment_data(
                             self.trainer_param, batch_itm, list(self.prediction_model.agent_input_encoders.keys())
                         )
@@ -1458,7 +1437,6 @@ class PredictionProtobufTrainer:
                     # Get the stats of the first sample, assuming the stats is consistent across all samples.
                     stats = stats_list[0]
 
-                    # TODO(guy.rosman) Introduce a global un-normalizing of coordinates, to check for deployment.
                     for key in statistic_keys:
                         if key in statistics and key in stats:
                             if isinstance(stats[key], list):
@@ -1522,7 +1500,6 @@ class PredictionProtobufTrainer:
                         import IPython
 
                         IPython.embed(header="Look at different predictor models")
-                        # TODO: visualize batch_itm['images'], others.
                         continue
 
                     self.profiler.step("before_compute_cost")
@@ -1532,11 +1509,8 @@ class PredictionProtobufTrainer:
                             is_generator_update = True
                         if_log_worst_case = not skip_visualization
                         if is_generator_update:
-                            # TODO(guy.rosman): separate into a function of computer_generator_cost +
-                            # TODO  all the statistics.
 
                             # Compute generator costs.
-                            # TODO(cyrushx): Skip gt trajectory after computing the loss.
                             (g_cost1, g_stats) = self.nondistributed_prediction_model.compute_generator_cost(
                                 past_trajectory=input_tensor[..., :2],
                                 past_additional_inputs=additional_inputs,
@@ -1559,7 +1533,6 @@ class PredictionProtobufTrainer:
                             predicted_semantics = None if not self.use_semantics else g_stats["predicted_semantics"]
                             visual_size = min(visual_size, batch_size)
 
-                            # TODO(guy.rosman): consider unifying with runner statistics loggers calls.
                             data_dict = {
                                 "batch_itm": batch_itm,
                                 "batch_cost": g_cost1,
@@ -1589,7 +1562,6 @@ class PredictionProtobufTrainer:
                                     )
 
                             # Update worse case for each agent index, according to valid agent MoN fde.
-                            # TODO(cyrushx): Make this for each agent type instead.
                             for agent_idx in range(self.trainer_param["max_agents"]):
                                 logger_key = f"fde_agent_{agent_idx}"
                                 # rel_agent_mon_fde = g_stats["agent_mon_fde"][:, agent_idx]
@@ -1607,8 +1579,6 @@ class PredictionProtobufTrainer:
                                 for skey in self.prediction_model.get_semantic_keys():
                                     key = "semantic_costs/" + skey
                                     if key in g_stats:
-                                        # TODO(ThomasB): Can this be removed into training_utils? g_stats doesn't exist
-                                        # TODO  until the training loop is run.
                                         if not if_log_worst_case:
                                             continue
 
@@ -1667,7 +1637,6 @@ class PredictionProtobufTrainer:
                             if self.use_semantics:
                                 for skey in self.prediction_model.get_semantic_keys():
                                     key = "semantic_costs/" + skey
-                                    # TODO(guy.rosman): Clean up statistics_sums.
                                     if key in g_stats:
                                         curr_sum = statistics_sums.get(key, 0)
                                         if isinstance(g_stats[key], list):
@@ -1683,7 +1652,6 @@ class PredictionProtobufTrainer:
 
                             data_samples_cnt += len(g_stats["data_cost"])
 
-                            # TODO(guy.rosman): move to function.
                             # Choose the first trajectory if multiple trajectories are predicted.
                             if dataloader_type == "validation" and self.trainer_param["validate_multiple_samples"]:
                                 worst_predicted_traj_sample_size = worst_case_loggers[
@@ -1756,9 +1724,6 @@ class PredictionProtobufTrainer:
                                 import IPython
 
                                 IPython.embed(header="nan/inf d_cost2")
-                            # TODO(ThomasB): See if we can remove accumulation of values from cost computation, or
-                            # TODO  add division by "MoN number samples" inside cost computation to keep things consistent in
-                            # TODO  the trainer.
                             d_cost += d_cost2.mean() / 2.0 * self.trainer_param["MoN_number_samples"]
                             if self.debugger is not None:
                                 self.debugger.record_value(f"{dataloader_type}_d_cost", d_cost)
@@ -1988,7 +1953,6 @@ class PredictionProtobufTrainer:
                                             global_step=global_batch_cnt,
                                         )
 
-                        # TODO(cyrushx): Fix the last condition.
                         if (
                             len(statistics[key]) > 0
                             and len(np.hstack(statistics[key])) > 1
@@ -2229,8 +2193,6 @@ class PredictionProtobufTrainer:
                         if new_save_validation_criterion < save_validation_criterion:
                             save_validation_criterion = new_save_validation_criterion
 
-                            # TODO(guy.rosman): save the lower-validation score model so far,
-                            # TODO  in addition / instead of "latest model".
                             self.message_logger.log_message(
                                 "Current best save criterion: {}".format(save_validation_criterion)
                             )
@@ -2251,9 +2213,6 @@ class PredictionProtobufTrainer:
                 if self.logger is not None:
                     self.logger.epoch_end(epoch=epoch, global_batch_cnt=global_batch_cnt)
 
-                # TODO(igor.gilitschenski): This variable was originally neither a global batch count, nor a global
-                # TODO  epoch count. Placing it here, turns it at least into a global epoch count. I did not rename it
-                # TODO  for now due # to the big refactor freeze. But we should discuss how we want this to be.
                 global_batch_cnt += 1
                 self.profiler.step("after_dataset_loop")
 

@@ -86,10 +86,6 @@ class PredictionModel(PredictionModelInterface):
         Initialize class parameters.
         """
         super().__init__(params=params)
-        # TODO(guy.rosman): add a dictionary mapping from input key to child network type
-        # TODO(guy.rosman): instantiate, plug the child networks into the encoder
-        # TODO(guy.rosman): instantiate, plug the child networks into the discriminator (past) encoder
-        # TODO(guy.rosman): consider -- do we sometime need to plug into future decoder/ discriminator encoder? e.g. maps
 
         self.dropout_ratio = params["dropout_ratio"]
         self.device = device
@@ -186,8 +182,6 @@ class PredictionModel(PredictionModelInterface):
     def get_discriminator_agent_input_encoders(self):
         return self.discriminator_agent_input_encoders
 
-    # # TODO (igor.gilitscheski): This method should not be necessary. If everything is
-    # # TODO  placed in the right containers, PyTorch knows on its own what attributes are child modules.
     # def to(self, device):
     #     self.device = device
     #     self.model_encap = self.model_encap.to(device)
@@ -255,8 +249,6 @@ class PredictionModel(PredictionModelInterface):
                 else:
                     enc, additional_costs = self.input_encoders[key](additional_inputs[key], trajectory_data)
 
-                # TODO(igor.gilitschenski): In the philosophy of our structure, this should be done in ImageEncoder,
-                # TODO  which will require a change to the interface of our encoders allowing them to know the key.
                 if key == ProtobufPredictionDataset.DATASET_KEY_IMAGES:
                     # Shape (batch_size, num_total_timepoints, enc_output_dim)
                     enc = reformat_tensor(
@@ -296,7 +288,6 @@ class PredictionModel(PredictionModelInterface):
             scene_inputs_tensor = None
         return scene_inputs_tensor, dropout_draws, overall_additional_costs
 
-    # TODO(guy.rosman) fix this and scene tensor
     def fuse_agent_tensor(
         self, agent_additional_inputs, trajectory_data, transforms, discriminator=False, skip_visualization=None
     ):
@@ -323,8 +314,6 @@ class PredictionModel(PredictionModelInterface):
         if len(agent_additional_inputs) > 0:
             agent_additional_inputs_enc = []
             for key_i, key in enumerate(self.agent_input_encoders.keys()):
-                # TODO(igor.gilitschenski): Here we are injecting encoder_input explicitly and another time implicitly
-                # TODO  via agent_additional_inputs. This doubling seems not necessary.
                 if discriminator:
                     enc_input = agent_additional_inputs[key]
                     enc, additional_costs = self.discriminator_agent_input_encoders[key](
@@ -451,7 +440,6 @@ class PredictionModel(PredictionModelInterface):
 
         # Fuse agent state.
         # [batch_size, num_agent, num_past_steps, agent_inputs_tensor_dim]
-        # TODO(guy.rosman): fix agents to handle agents' coordinates
         agent_inputs_tensor, agent_additional_costs = self.fuse_agent_tensor(
             agent_additional_inputs,
             trajectory_data=normalized_trajectory_data,
@@ -477,7 +465,6 @@ class PredictionModel(PredictionModelInterface):
 
         additional_costs = copy.copy(scene_additional_costs)
         additional_costs.update(agent_additional_costs)
-        # TODO(cyrushx): Add map input to discriminator.
         results_list, decoding_list, stats = self.model_encap.generate_trajectory_sample(
             trajectory_data,
             dropped_trajectory_data,
@@ -524,7 +511,6 @@ class PredictionModel(PredictionModelInterface):
 
         return result, joined_decoding, stats, additional_costs
 
-    # TODO (igor.gilitscheski): This method should not be necessary and has been a source of bugs.
     # If everything is placed in the right containers, PyTorch knows on its own what attributes
     # are child modules. Storing of command line arguments can be done in the trainer.
     def save_model(
@@ -536,8 +522,6 @@ class PredictionModel(PredictionModelInterface):
         use_async: bool = False,
         save_to_s3: bool = False,
     ):
-        # TODO(guy.rosman): use jit.trace to save modules for TensorRT deployment (see intent/TrajectoryEstimator.py).
-        # TODO(guy.rosman): add loading for training/inspection.
         models_to_save = {
             "decoder": self.decoder,
             "encoder": self.encoder,
@@ -570,9 +554,7 @@ class PredictionModel(PredictionModelInterface):
             with open(folder + "/language_vocab.pkl", "wb") as fp:
                 pickle.dump(self.params["language_vocab"], fp)
 
-        # TODO(guy.rosman): add child network saving
 
-    # TODO (igor.gilitschenski): This method can be deprecated once save_model is deprecated.
     def load_model(self, folder):
         models_to_load = {
             "decoder": self.decoder,
@@ -678,7 +660,6 @@ class PredictionModel(PredictionModelInterface):
                         p_dict["input_encoders_" + key + "_" + str(p_i)] = p
         # import IPython;
         # IPython.embed(header='check what is frozen')
-        # TODO(guy.rosman) -- Cyrus, can we verify?
         for p_i, p in enumerate(list(self.model_encap.get_parameters(require_grad))):
             p_dict["encap_" + str(p_i)] = p
 
@@ -823,7 +804,6 @@ class PredictionModel(PredictionModelInterface):
             .view(batch_size * num_samples, num_agents, num_future_timesteps, traj_dim)
         )
         # replace the future trajectories of irrelevant agents with the acausal data
-        # TODO(cyrushx): [relevant_agents] Why we want to use expected values for irrelevant agents (they might be invalid)?
         future_trajectory_batch_sample = future_trajectory_batch_sample * add_samples_to_batch(
             relevant_agents[:, :, None, None], num_samples
         )
@@ -925,7 +905,6 @@ class PredictionModel(PredictionModelInterface):
         relevant_agents = relevant_agents.float()
         irrelevant_agents = 1.0 - relevant_agents
         # replace the future trajectories of irrelevant agents with the acausal data
-        # TODO(cyrushx): [relevant_agents] Why we want to use expected values for irrelevant agents (they might be invalid)?
         modified_future_trajectory = future_trajectory * relevant_agents[:, :, None, None]
         if not self.params["nullify_irrelevant_discriminator_agents"]:
             modified_future_trajectory = modified_future_trajectory + expected * irrelevant_agents[:, :, None, None]
@@ -1030,7 +1009,6 @@ class PredictionModel(PredictionModelInterface):
     ):
         """Compute generator training cost
 
-        TODO(igor.gilitschenski): The lists below are incomplete but correct. They have to be completed in a later PR
 
         Parameters
         ----------
@@ -1272,7 +1250,6 @@ class PredictionModel(PredictionModelInterface):
 
         # Aggregate square error over time steps.
         mon_agent_sqr_error_agg = agent_sqr_error.sum(-2)
-        # TODO(cyrushx): Shall we take the average over steps (see below), since trajectories come with different valid steps.
         # mon_agent_sqr_error_agg = agent_sqr_error.sum(-2) / (agent_visibility.sum(-2) + 1e-10)
 
         # Compute MoN error over samples.
@@ -1411,7 +1388,6 @@ class PredictionModel(PredictionModelInterface):
             additional_stats["ade_error/{}_sec".format(fde_point)] = [
                 x for x in ade_errs[fde_point].view(-1).tolist() if not np.isnan(x)
             ]
-            # TODO(igor.gilitschenski): Each of these entries contains still num_batch numbers. This does not make sene.
             additional_stats["MoN_fde_error/{}_sec".format(fde_point)] = [
                 x for x in MoN_fde_errs[fde_point].view(-1).tolist() if not np.isnan(x)
             ]

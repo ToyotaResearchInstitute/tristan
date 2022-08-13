@@ -14,7 +14,6 @@ from intent.multiagents.cache_utils import split_reading_hash
 from intent.multiagents.trainer_logging import TrainingLogger
 from triceps.protobuf.prediction_dataset import ProtobufPredictionDataset
 
-# TODO(guy.rosman): move the cache elements to a utils package.
 from triceps.protobuf.prediction_dataset_cache import CacheElement
 from triceps.protobuf.prediction_dataset_semantic_handler import (
     SEMANTIC_HANDLER_FINISH_IDX,
@@ -171,7 +170,6 @@ class LatentFactorsCallback(LatentFactorsTrainerCallback):
         if self.trainer_param["semantic_labels_balance_cap"] is not None:
             semantic_cap = trainer_param["semantic_labels_balance_cap"]
             label_pos_weights = label_pos_weights.clamp(1.0 / semantic_cap, semantic_cap)
-        # TODO(rui.yu): add label name
         text_weight = ""
         for i in range(len(label_pos_weights)):
             text_weight += "Label {}, {}: positive_weight = {}; [{}] positives; [{}] negatives.  \n".format(
@@ -202,7 +200,6 @@ class LatentFactorsCallback(LatentFactorsTrainerCallback):
 
         num_rebalance_workers = trainer_param["num_rebalance_workers"]
         rebalance_labels = {}
-        # TODO(guy.rosman): replace with dataloader to make it faster.
         for key in datasets:
             dataset = copy.copy(datasets[key])
             old_dts = []
@@ -271,7 +268,6 @@ class LatentFactorsCallback(LatentFactorsTrainerCallback):
             class_ids = np.unique(balance_classes[dataset_key])
             for cls_id in class_ids:
                 class_idxs = indices_range[balance_classes[dataset_key] == cls_id]
-                # TODO(guy.rosman): place better conditions here on what makes sense to rebalance or is "too unbalanced"
                 assert len(class_idxs) > 0
                 rebalance_class_indices[cls_id] = class_idxs
         else:
@@ -335,7 +331,6 @@ def compute_semantic_costs(
             ids = semantic_labels[:, se_i, SEMANTIC_HANDLER_TYPE_IDX]  # batch_size
             start_times = semantic_labels[:, se_i, SEMANTIC_HANDLER_START_IDX]  # batch_size
             end_times = semantic_labels[:, se_i, SEMANTIC_HANDLER_FINISH_IDX]
-            # TODO(guy.rosman): fix times and prediction_timestamp.
             full_timestamps = prediction_timestamp.unsqueeze(1) + timestamps[:, -num_timestamps:]
             value = semantic_labels[:, se_i, SEMANTIC_HANDLER_VALUE_IDX]
             validity = semantic_labels[:, se_i, SEMANTIC_HANDLER_VALID_IDX]

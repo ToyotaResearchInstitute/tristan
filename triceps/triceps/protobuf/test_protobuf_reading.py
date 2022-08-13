@@ -129,7 +129,6 @@ if __name__ == "__main__":
         continue
     print("Done dataset read.")
 
-    # TODO(guy.rosman): Migrate an example with images.
     tqdm_iter = tqdm.trange(1000, desc="iter")
     for iteration in tqdm_iter:
         dataloader = DataLoader(dataset, batch_size=64, num_workers=64)

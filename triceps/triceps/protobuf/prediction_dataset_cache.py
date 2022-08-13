@@ -58,7 +58,6 @@ class CacheElement(object):
         return (not self.disable_cache) and os.path.exists(filename) and os.stat(filename).st_size > 0
 
     def is_cached(self):
-        # TODO(guy.rosman): use python filelock instead
         exist = self._check_exist(self.filename)
         if exist:
             self._cached_filename = self.filename

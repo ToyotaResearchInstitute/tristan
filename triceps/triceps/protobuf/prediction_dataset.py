@@ -177,7 +177,6 @@ class ProtobufPredictionDataset(Dataset):
         self.data = None
         self.debug_mode = mock_data_mode
         self.additional_input_stub = additional_input_stub
-        # TODO(guy.rosman): Take from params.
         self.input_stub_dim = input_stub_dim
         self.additional_agent_input_stub = additional_agent_input_stub
         self.agent_input_stub_dim = agent_input_stub_dim
@@ -348,7 +347,6 @@ class ProtobufPredictionDataset(Dataset):
         proto_prediction_instance: PredictionInstance = None,
     ) -> tuple:
         # Read the protobuf, parse and transform it.
-        # TODO(guy.rosman): extend the cache to the transformations, avoid any parsing
         cache_name = compute_hash(self.main_param_hash + f"parse_{self.rel_filename}_{item}")
         cache_element = CacheElement(
             os.path.join(self.cache_folder, "main_cache"),
@@ -411,8 +409,6 @@ class ProtobufPredictionDataset(Dataset):
         is_invalid_instance: bool
             is the instance invalid.
         """
-        # TODO(guy.rosman) Complete documentation of the outputs.
-        # TODO(guy.rosman) Check loading efficiency.
         positions_list = []
         dot_key_list = []
 
@@ -507,8 +503,6 @@ class ProtobufPredictionDataset(Dataset):
 
             is_ego_or_relevant = is_ego_vehicle_k + is_relevant_agent_k
 
-            # TODO(blaise.bruer) We may actually need a trajectory_handler for inference_mode, but for rapid development
-            # TODO  reasons we are skipping it in inference_mode.
             if self.trajectory_handler is None and not self.inference_mode:
                 positions_k = positions_k[: self.total_timesteps, :]
                 timestamps = timestamps[: self.total_timesteps]
@@ -548,7 +542,6 @@ class ProtobufPredictionDataset(Dataset):
                     # if is_invalid_trajectory -- do not populate dot_valid_key_list
                     continue
 
-            # TODO(guy.rosman): populate partially for invalid trajectories, rule them out later.
             assert len(positions_k) == self.total_timesteps, "k_i = {}, filename = {}".format(k_i, self.filename)
             assert len(timestamps) == self.total_timesteps, "k_i = {}, filename = {}".format(k_i, self.filename)
             positions_list.append(positions_k)
@@ -583,7 +576,6 @@ class ProtobufPredictionDataset(Dataset):
         # import IPython;IPython.embed(header='before selector')
         if self.agent_selection_handler:
 
-            # TODO(guy.rosman): have the trajectory handler get dot_valid_key_list and use it to prune
             (
                 positions,
                 is_ego_vehicle,

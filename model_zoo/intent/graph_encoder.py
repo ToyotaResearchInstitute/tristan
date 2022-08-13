@@ -53,14 +53,12 @@ class GraphEncoder(nn.Module):
             if self.params["special_init"]:
                 nn.init.normal_(linear_net.bias, 0.0, 0.01)
                 nn.init.xavier_uniform_(linear_net.weight)
-            # TODO(guy.rosman) -- followup, see why BatchNorm is causing problems, check w/ Cyrus.
             # self.input_module = nn.Sequential(linear_net,nn.BatchNorm1d(node_hidden_dim))
             if self.use_layer_norm:
                 self.input_module = nn.Sequential(linear_net, nn.LayerNorm(node_hidden_dim), nn.ReLU())
             else:
                 self.input_module = nn.Sequential(linear_net, nn.ReLU())
         else:
-            # TODO(cyrushx): Fix BatchNorm1d in create_mlp
             self.input_module = create_mlp(
                 input_dim=2 * (input_dim + 1),
                 layers_dim=self.params["coordinate_encoder_widths"] + [node_hidden_dim],
@@ -200,7 +198,6 @@ class GraphEncoder(nn.Module):
         trajectories = inputs["trajectories"]
         normalized_trajectories = inputs["normalized_trajectories"]
         agent_type = inputs["agent_type"]
-        # TODO(guy.rosman): check and if so remove.
         scene_data = inputs["scene_data"]
         agent_data = inputs["agent_data"]
         relevant_agents = inputs["relevant_agents"]
@@ -242,7 +239,6 @@ class GraphEncoder(nn.Module):
                         IPython.embed()
                     processed_scene = self.scene_processor(scene_data[:, t, :])
                 if self.agent_dim > 0:
-                    # TODO(guy.rosman): add per-agent agent data.
                     processed_agent = self.agent_processor(agent_data[:, i, t, :])
                     # Zero irrelevant agent states.
                     processed_agent = processed_agent * relevant_agents[:, i][:, None].float()
@@ -419,5 +415,4 @@ class GraphEncoder(nn.Module):
                 self.edges.append((i, j, "edge"))
 
     def save_model(self, data, is_valid):
-        # TODO(guy.rosman): Implement using torch.jit.trace.
         pass

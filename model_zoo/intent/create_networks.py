@@ -239,7 +239,6 @@ def create_mlp(
     else:
         layers_dim = [input_dim] + layers_dim
         layers = []
-        # TODO(cyrushx): Investigate why batchnorm decreases performance.
         if pre_bn and batch_norm:
             layers.append(nn.BatchNorm1d(layers_dim[0]))
         for l_i, (ld, ld_p1) in enumerate(zip(layers_dim[:-1], layers_dim[1:])):

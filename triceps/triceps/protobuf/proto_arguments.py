@@ -58,7 +58,6 @@ RAD_ENVIRONMENT_OVERRIDES = [
 
 def add_environment_fallback_alerts(param_names: List[str], parser: argparse.ArgumentParser):
     """Monkey patches provided parser to generate a print message when default value is sourced from environment"""
-    # TODO(nicholas.guyett.ctr) replace this with a less hacky solution
     fallback_sentinel = "!!!fallback_sentinel!!!"  # used as temporary default for detection purposes
 
     def create_fallback(param: str, original_type: Callable, original_default: Any):
@@ -108,7 +107,6 @@ class ArgKeyValuePair:
         key_type: Callable[[str], Any] = str,
         value_type: Callable[[str], Any] = str,
     ):
-        # TODO(nicholas.guyett.ctr) preserve separator for advanced usages with regexes
         key, value = string.split(separator, maxsplit=1)
         self.key = key_type(key)
         self.value = value_type(value)
@@ -219,7 +217,6 @@ def expand_user_path_params(params: Dict, additional_keys: List[str] = None) -> 
 
     # Expand any ArgPaths in the parameters
     for key, value in params.items():
-        # TODO clean up collection handling
         if isinstance(value, ArgPath):
             params[key] = value.with_prefix(params)
         elif isinstance(value, list):
@@ -349,7 +346,6 @@ def parse_arguments(
     :param additional_arguments_setter: a function that takes an argparse.ArgumentParser object and adds arguments
     to it for a specific usecase. Can be a list of those.
     :param default_override: A dictionary to override the default values
-    TODO: move any GNN-prediction-training specific flags to the argument setter.
     :return:
     """
     parser = argparse.ArgumentParser(
@@ -866,7 +862,6 @@ def parse_arguments(
     parsed_args.provided_args = sys.argv[1:].copy() if args is None else args
 
     # Multithreading breaks on OSX
-    # TODO Fix multithreading on OSX
     if platform.system() == "Darwin" and parsed_args.num_workers > 0:
         print("Multithreading is not currently supported on OSX.  All worker parameters have been set to 0")
         parsed_args.num_workers = 0
@@ -889,8 +884,6 @@ def verify_and_update_arg(parser, arg_name, **kwargs):
     kwargs : arguments
         The arguments to use for the flag.
     """
-    # TODO(guy.rosman): Find a stable way to get default arguments from the parser
-    # TODO  (e.g. help message for an existing flag) rather than having to copy them.
     arg_dict = vars(parser.parse_args([]))
     arg_name_stripped = arg_name[2:].replace("-", "_")
     assert arg_name_stripped in arg_dict

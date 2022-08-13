@@ -99,7 +99,6 @@ class LatentFactors(ABC, nn.Module):
         """
         return 0
 
-    # TODO(guy.rosman) -- this should be more general. reset_factors_state.
     def reset_generated_samples(self):
         """
         Reset generated samples.
@@ -175,7 +174,6 @@ class LatentFactors(ABC, nn.Module):
         """
         return None
 
-    # TODO(guy.rosman) unify the use and notation of discrete vs continuous time.
     def overwrite_initial_lstm_state(self, intermediate_output: torch.Tensor, i: int, t: int) -> torch.Tensor:
         """
         Overwrite initial lstm state at decoder when t=0.
@@ -301,7 +299,6 @@ class ExplicitDurationTruncatedFunction(nn.Module):
             input_dim=self.intermediate_dim, layers_dim=self.internal_dims + [self.duration_param_dim], dropout_ratio=0
         )
 
-        # TODO: remove once ED is implemented.
         self.value = nn.Linear(1, 1, bias=False)
         self.out_features = self.value.out_features
         self.initial_state_tensor = None
@@ -333,12 +330,9 @@ class ExplicitDurationTruncatedFunction(nn.Module):
         batch_t = t.repeat(cumulative_durations.shape)
 
         dt = cumulative_durations - batch_t
-        # TODO(guy.rosman) update the weight definition.
         weights = (dt / self.transition_scale).sigmoid()
         weights = weights[..., 1:] - weights[..., :-1]
         weights = weights / weights.sum(dim=-1, keepdim=True)
-        # TODO(guy.rosman): extend to vectorial, verify sample times correctness
-        # TODO(guy.rosman): precompute durations/values, only sample here for better efficiency
         sample = (weights * values).sum(dim=-1).unsqueeze(-1)
         return sample
 
@@ -353,7 +347,6 @@ class ExplicitDurationTruncatedFunction(nn.Module):
         segment_params = self.segment_param_module(intermediate_state)
 
         base_randomness = torch.normal(0, 1, [self.num_segments], device=intermediate_state.device)
-        # TODO(guy.rosman) make the STD exponential so that it's positive.
         durations = n_copies(segment_params[..., 1], self.num_segments)
         while base_randomness.dim() < durations.dim():
             base_randomness.unsqueeze_(1)

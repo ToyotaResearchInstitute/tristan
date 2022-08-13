@@ -54,7 +54,6 @@ def is_condition_tested_worst_cases(obj, statistics_json, slice_names, group_typ
     """
     Compares the json object's fname and timestamp to statistics_json, getting the worst examples according to
     group type, for the slice names (e.g, nll_highest for all slices)
-    TODO: replace with a more general comparison to match adovehicles or other data instances
     :param obj:
     :param statistics_json:
     :param slice_names:
@@ -62,7 +61,6 @@ def is_condition_tested_worst_cases(obj, statistics_json, slice_names, group_typ
     :return:
     """
     result = False
-    # TODO: check condition logic for searching over json
     assert "slice_results" in statistics_json
     slices = statistics_json["slice_results"]
     if slice_names is None or not slice_names:
@@ -112,7 +110,6 @@ def is_condition_stop_m(res, past_horizon=23, future_horizon=23):
     future_traj_sqr_diff = [dist_sqr(future_traj[i], future_traj[i + 1]) for i in np.arange(future_horizon - 1)]
     # print("future_traj_sqr_diff")
     # print(future_traj_sqr_diff)
-    # TODO: Won't get _quite_ to zero
     return np.count_nonzero(future_traj_sqr_diff) < future_horizon * 4 / 5
 
 
@@ -939,7 +936,6 @@ def proximity_filter(agent_trajectories: OrderedDict, scene_information: Ordered
             np.stack([x_interp(target_agent_traj[:, 2]), y_interp(target_agent_traj[:, 2])])
         )
         # Compute distance between the 2 agents.
-        # TODO: consider using TTC instead.
         agents_dist = np.sum((other_agent_traj_registered - target_agent_traj[:, :2]) ** 2, 1)
         min_idx = np.argmin(agents_dist)
         min_val = np.min(agents_dist)

@@ -8,8 +8,6 @@ from torch import nn
 from intent.multiagents.trainer_logging import TrainingLogger
 
 
-# TODO(guy.rosman): merge w/ the prediction model w/ normalizing transform class,
-# TODO: check why the regression test score goes 2.2 -> 3.351.
 def range_tensor(tensor, range_dim):
     """
     Computes a tensor with a linear range value [0,...shape[range_dim]] according to one of its axes.
@@ -122,7 +120,6 @@ class PredictionModelInterface(nn.Module, ABC):
         time_weights = (dt_relative + time_weights_epsilon) ** (-1)
         tensored_range = range_tensor(is_valid, 2)
         # Compute local shifting vectors.
-        # TODO(rui.yu): Handle agents without any samples.
         x = (trajectory_data[:, :, :, 0] * is_valid.float() * time_weights.unsqueeze(1)).sum(dim=2) / (
             (is_valid.float() * time_weights.unsqueeze(1)).sum(dim=2) + 1e-10
         )
@@ -152,7 +149,6 @@ class PredictionModelInterface(nn.Module, ABC):
             time_start = (dt_agents * mask_start).sum(2)
             time_end = (dt_agents * mask_end).sum(2)
             velocity = (pos_end - pos_start) / (time_end - time_start).abs().repeat(2, 1, 1).permute(1, 2, 0)
-            # TODO(guy.rosman): add assert that if the past is full length, these results match.
             velocity_v = pos_end - pos_start
             velocity_v[..., 0] += 1e-9  # Add epsilon to velocity x to avoid divide by 0 in computing R.
             v1 = (

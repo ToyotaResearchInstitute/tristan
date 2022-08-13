@@ -8,7 +8,6 @@ import torch.nn as nn
 from intent.multiagents.latent_factors import compute_semantic_costs
 
 
-# TODO(guy.rosman): try "class PredictionModelCodec(nn.Module):" and see if any contradictions in the code.
 class PredictionModelCodec:
     """
     A class wrapper for generator and discriminator-based predictors.
@@ -63,7 +62,6 @@ class PredictionModelCodec:
             self.discriminator_head = models["discriminator_head"]
 
         # Load latent factors.
-        # TODO(guy.rosman): Move to separate class.
         self.latent_factors = None
         if self.use_latent_factors:
             self.latent_factors_generator = self.params["latent_factors_generator"]
@@ -75,7 +73,6 @@ class PredictionModelCodec:
             self.semantic_emissions = nn.ModuleDict()
             self.semantic_index = OrderedDict()
 
-        # TODO(guy.rosman): Encapsulate latent factors as an optional class to include the loading and computation from bottleneck.
         if "latent_factors_file" in self.params and self.params["latent_factors_file"] is not None:
             with open(self.params["latent_factors_file"]) as fp:
                 self.semantic_definitions = json.load(fp)
@@ -243,7 +240,6 @@ class PredictionModelCodec:
         # The decoder used to loop over sample_indices, this code is to keep the res_traj consistent with old code.
         # Should be removed when possible. Note, the outer function keep the [sample] dim as the last dim.
         for i, sample_index in enumerate(sample_indices):
-            # TODO: remove unsqueezes and verify use stack vs. cat in downstream uses.
             # List item shape: [B x num_agents x T x 2 x 1]
             results_list.append(res_traj[:, :, i].unsqueeze(-1))
             if joined_decoding is not None:
@@ -311,7 +307,6 @@ class PredictionModelCodec:
             result = torch.mean(self.discriminator_head(intermediate_result2[:, :, -1, :].sum(dim=1)), dim=1).clamp(
                 -1, 1
             )
-        # TODO(justin.lidard) encapsulate in prediction_reward_model
         elif "learn_reward_model" in self.params.keys():
             combined_result = torch.cat((intermediate_result, intermediate_result2), axis=2)
             result = self.discriminator_head(combined_result[:, :, -1, :].sum(dim=1))
@@ -327,7 +322,6 @@ class PredictionModelCodec:
             IPython.embed(header="nan/inf in discriminate_trajectory")
         return result
 
-    # TODO(cyrushx): Move to a seperate file.
     def compute_extra_cost(
         self,
         predicted,
@@ -351,7 +345,6 @@ class PredictionModelCodec:
             "is_future_valid": is_future_valid,
         }
         # Compute semantics cost.
-        # TODO(guy.rosman): change to use a given callback once hybrid is also moved.
         for cb in self.additional_structure_callbacks:
             cb.update_costs(
                 additional_stats=additional_stats,
@@ -401,7 +394,6 @@ class PredictionModelCodec:
         return models_to_count
 
     def get_parameters(self, require_grad=True):
-        # TODO(guy.rosman): Ask HOP to check if there is a way to identify missing models.
         p_list = []
         if self.use_semantics:
             for p in self.semantic_emissions.parameters():

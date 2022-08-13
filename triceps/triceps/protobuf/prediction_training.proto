@@ -3,7 +3,6 @@
 
 syntax = "proto3";
 
-// TODO(guy.rosman): find the right location for it.
 package dgp.proto;
 
 import "google/protobuf/timestamp.proto";
@@ -25,14 +24,12 @@ message TimestampedState  {
   // Convention: q=( a + bi + cj + dk), with a>0 (similar to pygeometry)
   repeated float rotation_aw = 4;
   // Heading of the obstacle.
-  // TODO(guy.rosman) adhere to driving notation on heading.
   repeated float heading = 5;
 
   // Dimensions of the dynamic obstacle / agent.
   float width = 6;
   float length = 7;
   float height = 8;
-  // TODO(guy.rosman, for kuan.lee, chao.fang): Associate to track id in DGP.
 
   // Uncertainty for each of the agents, for now agents are independent in each sample.
   TimestampedStateUncertainty uncertainty_estimate = 9;
@@ -86,9 +83,6 @@ message TimestampedPredictionInput {
   // Vector input with some semantic -- e.g pedals for egovehicle, PA vector for pedestrian, etc
   repeated float vector_input = 5;
   string vector_input_type_id = 6;
-  // TODO(guy.rosman) Consider: associate to image,bboxes in DGP?
-  // TODO(guy.rosman) Consider: associate to lidar in DGP?
-  // TODO(guy.rosman) Consider: how does this relate to maps? Consider pointing to a LocalMap or similar per agent?
   LocalMap local_map = 7;
 }
 
@@ -219,10 +213,8 @@ message Zone {
 message LocalMap {
   // Lanes list.
   repeated Lane lanes = 1;
-  //TODO(guy.rosman): Handle labeled polylines.
   // List of zones, such as crosswalk regions.
   repeated Zone zones = 2;
-  // TODO(guy.rosman): Add rasterized maps support.
   // An id to store reference to map files and position in them. Format is a json, fields are not specified.
   string external_map_id = 3;
   // A general encoding of map information
@@ -242,7 +234,6 @@ message PredictionInstance {
   // Per-agent information, such as trajectories, images.
   LocalMap map_information = 3;
 
-  // TODO(guy.rosman): Address map semantics (TL states) TimedSemanticTarget example.
   repeated TimestampedSemanticTarget semantic_targets = 4;
   string egovehicle_id = 5;
 
@@ -257,7 +248,6 @@ message PredictionInstance {
   // Specific field on whether this instance is from a background distribution or not.
   // Example: if the dataset is for pedestrian prediction, we may need to balance "rare events" collected by the filter
   // with general/background behavior.
-  // TODO(guy.rosman): replace with a more general scheme, for multitask datasets.
   bool is_leaked = 8;
 
   // The timepoint of the source data collection. (e.g. when did we see this example)
@@ -283,8 +273,6 @@ message PredictionSetInformation {
   // Additional information about the set that does not breach people's privacy.
   string data_source = 1;
   google.protobuf.Timestamp creation_time = 2;
-  // TODO(guy.rosman) Add other metadata fields.
-  // TODO(guy.rosman): add some location id beyond "city", which was added for compatibility w/ Argoverse.
   string city = 3;
 }
 
@@ -292,7 +280,6 @@ message PredictionSet{
   repeated PredictionInstance prediction_instances = 1;
   PredictionSetInformation information = 2;
   repeated float instance_weights = 3;
-// TODO(guy.rosman): Verify support for Argoverse (partially supported),
 // nuScenes (partially supported),
 // interaction dataset, DFS.
 }

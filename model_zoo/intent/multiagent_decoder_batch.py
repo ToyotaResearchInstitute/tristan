@@ -163,7 +163,6 @@ class AugmentedMultiAgentDecoderAccelerated(AugmentedMultiAgentDecoder):
         # LSTM starts
         for time_idx in range(self.num_timepoints):
             tensor_t = intermediate_output[0][0][0].new_tensor([time_idx * self.timestep])
-            # TODO(guy.rosman): add usage of latent factor as a latent_factors.time_sample(timepoint).
             # [batch, agents, samples, intermediate_dim]
             if time_idx == 0:
                 # Read current position from last observed position at t=0.
@@ -176,7 +175,6 @@ class AugmentedMultiAgentDecoderAccelerated(AugmentedMultiAgentDecoder):
             # Obtain latent factors states.
             if self.use_latent_factors:
                 # Generate initial latent factors before decoding
-                # TODO(guy.rosman): merge w/ reset_generated_samples()
                 if time_idx == 0:
                     # Use the stats to pass out latent_factor_output, additional_params is accessible at TrainingStrategy level.
                     stats = {}
@@ -228,7 +226,6 @@ class AugmentedMultiAgentDecoderAccelerated(AugmentedMultiAgentDecoder):
                 sampled_values = OrderedDict()
                 if self.params["latent_factors_drop"]:
                     for key in self.latent_factors_keys:
-                        # TODO: make more efficient
                         sampled_values[key] = latent_factors.get_dimensionality(key)
                     augmented_list.append(
                         augmented_intermediate_output.new_zeros(batch_size, np.sum(list(sampled_values.values())))
@@ -295,7 +292,6 @@ class AugmentedMultiAgentDecoderAccelerated(AugmentedMultiAgentDecoder):
         else:
             result = generated
 
-        # TODO(guy.rosman): move to update_stats.
         if latent_factors is not None:
             cumulative_durations_dict = {}
             if hasattr(latent_factors, "factor_names"):

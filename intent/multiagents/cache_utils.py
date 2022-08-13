@@ -161,7 +161,6 @@ def get_hashing_params(params_in: dict, param_key_list=PARAM_HASH_LIST) -> dict:
     # Add additional params to the list, in case a non-standard predictor (i.e. hybrid, language) is used.
     # This additional list should be specified by the training script, and not used by default.
     # So that changing the additional params wouldn't affect the param_hash who don't use it.
-    # TODO(xiongyi): Separate data handler cache.
     if "additional_cache_param_list" in params_in:
         additional_cache_params = params_in["additional_cache_param_list"]
         for p in additional_cache_params:
@@ -218,7 +217,6 @@ def split_reading_hash(params: dict, postfix: str = "") -> str:
     ]:
         params_copy.pop(key, None)
 
-    # TODO(guy.rosman): remove keys that shouldn't matter from the parameters, or replace with keys that do matter.
     return compute_hash(str(params_copy) + postfix)
 
 

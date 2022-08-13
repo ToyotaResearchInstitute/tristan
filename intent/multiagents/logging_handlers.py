@@ -787,9 +787,6 @@ class SaveErrorStatistics(LoggingHandler):
 
         if param["runner_test_vehicle_filter"]:
 
-            # TODO(guy.rosman): Di.Sun: save results for 3PJ table, based on predicted_trajectories_scene, expected
-            # TODO trajectories, etc..
-            # TODO(guy.rosman): verify correctness: filter out the predicted, expected trajectory, visibility, etc..
             valid_instances = compute_valid_test_instances(batch_itm)
             try:
                 predicted_trajectories_scene = predicted_trajectories_scene[valid_instances, ...]
@@ -915,7 +912,6 @@ class SaveErrorStatistics(LoggingHandler):
                         self.aggregate_statistics[prefix + self.VALID_SPECIFIC_MISSES + "_" + axis + "_MoN"][key]
                     )
 
-        # TODO(guy.rosman): Add more statistics.
 
     def epoch_end(self, idx: int, global_batch_cnt: int, skip_visualization: bool = False) -> None:
         """Logger logic triggered at the end of an epoch.
@@ -1334,7 +1330,6 @@ class SaveExamplesLogHandler(LoggingHandler):
                             json.dump(tracks, fp, indent=2)
                     except:
                         print("json save failed")
-                        # TODO(guy.rosman): find the cases in the runner where json saving failed.
 
             try:
                 # Plot and save prediction visualization, but only if the trajectory is not straight.
@@ -1530,7 +1525,6 @@ class LogWorstCases(LoggingHandler):
     )
 
     def __init__(self, logger_key: str, params: dict, output_folder_name: Optional[str] = None) -> None:
-        # TODO(guy.rosman): See if it makes sense to inherit from LoggingHandler as it's a slightly different usecase.
         super().__init__(params)
         self.logger_key = logger_key
         self.params = params
@@ -1821,15 +1815,11 @@ class LogWorstCases(LoggingHandler):
                         self.output_folder_name,
                         "worst_{}_{}_{}_folder".format(self.dataloader_type, logger_key_path_safe, cur_datapoint),
                     )
-                    # TODO(guy.rosman) either aws s3 sync the folder, or save a pointer to it.
                     save_json_cmd_filename = os.path.join(
                         self.output_folder_name,
                         "worst_{}_{}_{}_cmd.json".format(self.dataloader_type, logger_key_path_safe, cur_datapoint),
                     )
                     copy_command = ["aws", "s3", "sync", folder_name, save_tlog_foldername]
-                    # TODO(guy.rosman) - here we can use the tlog,timestamp, and fetch the video with the command above.
-                    # TODO  Should add an option to do this and not just save the command,
-                    # TODO  but it's too expensive to run for every example.
                     with open(save_json_cmd_filename, "w") as fp:
                         json.dump(
                             {
@@ -1923,7 +1913,6 @@ class WaymoLogHandler(LoggingHandler):
             pred_gt_indices_mask = pred_gt_indices_mask.transpose(1, 2)
 
         # Fake the score.
-        # TODO(cyrushx): Add score once it is available.
         # [batch_size, num_preds, top_k].
         pred_score = torch.ones(pred_trajectory_final.shape[:3])
 

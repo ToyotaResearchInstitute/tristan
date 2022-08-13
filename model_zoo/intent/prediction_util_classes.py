@@ -244,8 +244,6 @@ class LocalProcessing(nn.Module):
         self.additional_tasks[("future_position_2")] = self.future_position_net
 
         # This dictionary is used to store additional parameters used for additional task computation
-        # TODO(guy.rosman): Consider refactoring and using functools.partial and a single ModuleDict
-        # TODO  with a specific class interface.
         self.additional_tasks_inputs = {}
         self.additional_tasks_inputs[("future_position_1")] = 1.0
         self.additional_tasks_inputs[("future_position_2")] = 2.0
@@ -269,7 +267,6 @@ class LocalProcessing(nn.Module):
         result_map = neighborhood
         result_embedding = neighborhood_embedding
         # This is used to normalize input sizes.
-        # TODO(guy.rosman): replace with a more general approach.
         map_scale = 10
         for _ in range(2):
             results_aggregate = result_embedding
@@ -370,7 +367,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         self.traj_encoder = nn.Linear(self.traj_input_dim, self.embed_size)
 
         # Set up graph.
-        # TODO(guy.rosman): consider not storing data in the class but move w/ functions.
         self.node_states = OrderedDict()
         self.edge_states = OrderedDict()
         self.map_data = None
@@ -434,8 +430,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         self.additional_tasks[("future_position_2")] = self.future_position_net
 
         # This dictionary is used to store additional parameters used for additional task computation
-        # TODO(guy.rosman): Consider refactoring and using functools.partial and a single ModuleDict
-        # TODO  with a specific class interface.
         self.additional_tasks_inputs = {}
         self.additional_tasks_inputs[("future_position_1")] = 1.0
         self.additional_tasks_inputs[("future_position_2")] = 2.0
@@ -500,7 +494,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         if profiling:
             print("message_passing: node processing: {} s".format(t3 - t2))
             print("message_passing: total {} s".format(t3 - t0))
-        # TODO(cyrushx): do we need global states?
         self.edge_states = new_edge_states
         self.node_states = new_node_states
 
@@ -595,7 +588,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         closest_dist_indices = torch.argsort(dists, -1)
 
         # Reorder the indices so that we can closest k elements from each unique map element.
-        # TODO(cyrushx): Find a more efficient way to do this.
         closest_dist_indices_per_element = torch.zeros_like(closest_dist_indices)
         for b in range(batch_agents_size):
             map_id_b = map_id[b]
@@ -652,7 +644,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         )
 
         # Compute distance among each selected point.
-        # TODO(cyrushx): Add point id when computing the distance.
         # [num_batch_element, top_k_points, point_feature_size].
         nearest_coord = torch.cat([nearest_x.unsqueeze(2), nearest_y.unsqueeze(2), nearest_type.unsqueeze(2)], 2)
         nearest_coord_pairwise_distance = compute_distance_matrix(nearest_coord)
@@ -672,7 +663,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         )
 
         # Add distance kernel to map embeddings.
-        # TODO(cyruxh): Add attention / GNN message passing.
         # [num_agent_batch, num_steps, embed_size]
         dist_kernel = 1.0 / (top_k_dists - torch.min(top_k_dists, -1, keepdim=True)[0] + 1.0)
         trajectory_map_embedding = (dist_kernel.unsqueeze(-1) * top_k_map_embeddings_augmented).sum(2)
@@ -825,7 +815,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
             map_embed_size].
         """
         # Subsample map data.
-        # TODO(cyrushx): Shall we do it in the dataloader?
         map_data = map_data[:, :: self.params["map_points_subsample_ratio"]]
         map_embeddings = map_embeddings[:, :: self.params["map_points_subsample_ratio"]]
         map_validity = map_validity[:, :: self.params["map_points_subsample_ratio"]]
@@ -857,10 +846,8 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         # [batch_agent_size, num_past_steps, num_map_elements, embed_size]
         map_embeddings_v = map_embeddings_v[:, None].expand(s_v[0], num_step, s_v[1], s_v[2])
 
-        # TODO(cyrushx): Verify attention vs. maxpool.
         attention_score = torch.matmul(traj_embedding_q.unsqueeze(2), map_embeddings_k.transpose(2, 3))
         # Replace invalid score with a very small number.
-        # TODO(cyrushx): Is there a better way to do it?
         attention_score = attention_score * map_validity.unsqueeze(1).unsqueeze(1)
         attention_score = attention_score + (1.0 - map_validity.unsqueeze(1).unsqueeze(1)) * (-10000)
         attention_score_p = nn.Softmax(dim=-1)(attention_score)
@@ -869,7 +856,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         # [batch_agent_size, num_past_steps, map_dim].
         map_embeddings_attention = map_embeddings_attention.squeeze(2)
 
-        # TODO(cyrushx): Move this outside of map embedding.
         for b in range(batch_agents_size):
             # Add additional costs info if given.
             if additional_costs is not None:
@@ -879,8 +865,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         point_count = map_validity.sum().detach().cpu().numpy()
         accumulate(additional_costs, "point_count", point_count)
 
-        # TODO(guy.rosman): propagate attention_effective_number back so that we can see whether the attention is
-        # TODO  reasonable.
         attention_effective_number = (1 / (attention_score_p**2)).sum(-1).mean().detach().cpu().numpy()
         return map_embeddings_attention
 
@@ -1013,7 +997,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         points_embedding = self.relu(points_embedding)
 
         # Reconstruct map features such as positions and headings.
-        # TODO(cyrushx): Make this optional.
         additional_stats = {}
         for key in self.additional_tasks:
             if key in self.additional_tasks_inputs:
@@ -1027,8 +1010,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
 
         map_validity = map_data[..., MapDataIndices.MAP_IDX_VALIDITY : MapDataIndices.MAP_IDX_VALIDITY + 1]
         position_coeff = self.params["map_reconstruction_position_coeff"]
-        # TODO(guy.rosman): once adding more reconstruction tasks, feed from parameters. This is a placeholder so
-        # TODO  that we know where to normalize costs.
         tangent_coeff = 1.0
         normal_coeff = 1.0
         type_coeff = 1.0
@@ -1084,7 +1065,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
 
         # Plot estimated positions.
         if self.logger is not None:
-            # TODO(nicholas.guyett.ctr) Move this code out of the model and into a configurable callback
             map_log_reconstruction_plot = self.params["map_log_reconstruction_plot"]
             map_plotting_epoch = additional_params is None or (
                 "skip_visualization" in additional_params and not additional_params["skip_visualization"]
@@ -1108,7 +1088,6 @@ class MapPointGNNEncoder(AdditionalInputEncoder):
         # Return map embedding at each traj point, with shape [batch_size, num_agents, num_past_steps, hidden_dim].
         outputs = outputs.view(batch_size, num_agents, num_past_steps, -1)
 
-        # TODO(guy.rosman): add more task to multitask reconstruction, make sure map is learned properly.
         return outputs, additional_costs
 
 
@@ -1377,7 +1356,6 @@ class LocalGraph(nn.Module):
 
     def forward(self, input_states):
         input_embedding = input_states
-        # TODO(cyrushx): Try self-attention.
         for i in range(self.layers):
             input_embedding = self.input_encoders[i](input_embedding)
             # Get max pool of neighbor embeddings.
@@ -1454,7 +1432,6 @@ class GlobalGraph(nn.Module):
             # Add residual.
             map_embedding += map_embedding_a2m
 
-            # TODO(cyrushx): Add attention for context agents.
             # # Run cross attention from target agent to context.
             # context_agent_embedding_a2c, _ = self.attention_a2c(
             #     query=context_agent_embedding,
@@ -1473,7 +1450,6 @@ class GlobalGraph(nn.Module):
             )
             target_agent_embedding = target_agent_embedding_a + target_agent_embedding_m2a
 
-            # TODO(cyrushx): Add attention for context agents.
             # target_agent_embedding_c2a, _ = self.attention_c2a(
             #     query=target_agent_embedding, key=context_agent_embedding, value=context_agent_embedding
             # )

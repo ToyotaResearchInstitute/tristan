@@ -898,7 +898,6 @@ def create_agent_input_encoders(params: dict, map_handler: callable, device: tor
 
 
 def prepare_cache_and_encoders(params):
-    # TODO(xiongyi) Circular dependency between data_handlers (need main_cache_hash) and prepare_cache (need data_hanlders' get_hash_param_keys())
     data_handlers, _ = create_handlers(params)
     params = prepare_cache(params, data_handlers)
     data_handlers, agent_map_handlers = create_handlers(params)
@@ -976,7 +975,6 @@ def prepare_cache(params, data_handlers=None):
     return params
 
 
-# TODO(guy.rosman) UNIFY move to separate file, use for vehicles.
 def perform_training_schedule(
     param_sets,
     device: torch.device,
@@ -1050,11 +1048,7 @@ def perform_training_schedule(
 
         # Create training model. input_dim is the past trajectories of the ado-agents, as everything else is optional.
         # agent_type_dim is the number of agent types (e.g., car, bicycle, motorcycle, pedestrian, large-vehicle, truck)
-        # TODO(guy.rosman) - see whether this can run for general predictors -- image -> intent,
-        # TODO  trajectory -> discrete labels, etc.
 
-        # TODO (ThomasB): Add All worst case loggers with keys here instead of in the trainer
-        # TODO  in prediction_trainer.py, see if possible to remove all special-case code for worst case logger function
         worst_cases_folder = params["runner_output_folder"] if params["logger_type"] == "none" else None
         additional_logging_handlers = [
             ImageStatsLogHandler(params, ProtobufPredictionDataset.DATASET_KEY_AGENT_IMAGES),
@@ -1068,7 +1062,6 @@ def perform_training_schedule(
         if params["use_waymo_dataset"] and params["report_waymo_metrics"]:
             additional_logging_handlers.append(WaymoLogHandler(params))
 
-        # TODO implement aggregation per agent-type
         # We assume relevant_agents to contain the ego vehicle and one pedestrian for now.
         for agent_idx in range(params["max_agents"]):
             logger_key = f"fde_agent_{agent_idx}"
@@ -1162,7 +1155,6 @@ def create_prediction_model(
         total_agent_dim += agent_input_encoder.out_features
     print("Total agent dim: {}".format(total_agent_dim))
     agent_type_dim = len(params["agent_types"])
-    # TODO(guy.rosman)poly: conditioned on flags -- use poly_encoder, poly_decoder
 
     if params["encoder_decoder_type"] == "polynomial":
         if not PolynomialEncoder or not PolynomialMultiAgentDecoder:
@@ -1340,7 +1332,6 @@ def create_prediction_model(
         additional_structure_callbacks=additional_structure_callbacks,
         additional_model_callbacks=additional_model_callbacks,
     ).to(device)
-    # TODO: Remove unneeded models.
     models.update({"model_encap": model_encap})
     prediction_model = prediction_model_cls(
         models=models,
@@ -1356,7 +1347,6 @@ def create_prediction_model(
 
 
 def perform_data_inference(params, device, additional_logging_handlers: list = None):
-    # TODO(igor.gilitschenski):inference with our current runner "params_level" seems to be irrelevant.consider removing
     if params["use_dummy_model"]:
         params["params_level"] = 0
     elif params["resume_session_name"] is not None:
@@ -1376,8 +1366,6 @@ def perform_data_inference(params, device, additional_logging_handlers: list = N
 
     # Create training model. input_dim is the past trajectories of the ado-agents, as everything else is optional.
     # agent_type_dim is the number of agent types (e.g., car, bicycle, motorcycle, pedestrian, large-vehicle, truck)
-    # TODO(guy.rosman) - see whether this can run for general predictors -- image -> intent,
-    # TODO  trajectory -> discrete labels, etc.
 
     prediction_model = create_prediction_model(params, device, agent_map_handlers, data_map_handler=data_handlers[0])
     trainer = PredictionProtobufTrainer(datasets, prediction_model, params, device=device)

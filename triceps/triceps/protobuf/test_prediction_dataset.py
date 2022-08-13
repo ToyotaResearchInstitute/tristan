@@ -69,7 +69,6 @@ def valid_agent_trajectory_dict(
 
     additional_inputs = []
     if is_ego:
-        # TODO replace with valid hash
         hash_prefix = "HASH_PREFIX"
         additional_inputs.append(dict(vectorInputTypeId="additional_input_egovehicle"))
         # Add image links
@@ -79,7 +78,6 @@ def valid_agent_trajectory_dict(
                     filename=json.dumps(
                         dict(
                             filename=f"{hash_prefix}_{i:07d}",
-                            # TODO check how significant this field is
                             folder="fake/folder",
                         )
                     )
@@ -219,7 +217,6 @@ def valid_protobuf_file(tmp_path, valid_prediction_set):
 
 @pytest.fixture()
 def model_params(tmp_path):
-    # TODO(nicholas.guyett.ctr) Decouple this fixture from the intent module
     cache_dir = tmp_path / "cache"
     return prepare_cache(
         prepare_pedestrian_model_params(
@@ -294,7 +291,6 @@ class TestPredictionDataset:
             source_additional_inputs = [trajectory["additionalInputs"] for trajectory in sorted_trajectories]
             assert valid_map_information == return_item[ProtobufPredictionDataset.DATASET_KEY_MAP_INFORMATION]
             assert source_additional_inputs == return_item[ProtobufPredictionDataset.DATASET_KEY_ADDITIONAL_INPUTS]
-            # TODO validate semantic data
             assert ProtobufPredictionDataset.DATASET_KEY_SEMANTIC_TARGETS in return_item
 
             return_item[mock_post_processing_key] = mock_post_processing_key
@@ -337,5 +333,3 @@ class TestPredictionDataset:
             source_trajectories,
         )
 
-    # TODO add test cases for "invalid" protobuf files
-    # TODO expand to stubs and hash methods?

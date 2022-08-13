@@ -253,7 +253,6 @@ def displacement_errors(
         * square_error: Mean square error weighted with the number of visible locations per agent.
         All other dict entries remain for compatibility and may potentially be updated / discarded in the future.
     """
-    # TODO expand result docstring
     num_agents = predicted_trajectory_scene.shape[1]
 
     results = {}
@@ -318,7 +317,6 @@ def displacement_errors(
 
     truncation_scale = param["predictor_truncation_scale"]
     if agent_types is not None and param["tailored_robust_function"]:
-        # TODO(guy.rosman): Feed in mapping from agent type to scale, to generalize pedestrians.
         pedestrian_noise_scale = param["pedestrian_noise_scale"]
         pedestrian_type_id = param["pedestrian_type_id"]
         per_agent_scale = torch.ones_like(agent_types[0:1, 0:1, :])
@@ -381,7 +379,6 @@ def displacement_errors(
             results.update({"agent_ades_{}".format(agent_type): {}})
 
     miss_thresholds_tensor = predicted_trajectory_scene.new_tensor(miss_thresholds)
-    # TODO(guy.rosman): Populate miss_thresholds_x_tensor from miss_thresholds_x, same for y.
     if not miss_thresholds_x:
         miss_thresholds_x = miss_thresholds
     if not miss_thresholds_y:
@@ -431,7 +428,6 @@ def displacement_errors(
         results["agent_fdes_y"][cur_horizon] = results["agent_fdes_y_partial"][cur_horizon].clone()
         results["agent_fdes_y"][cur_horizon][invalid_agents_full] = pos_norm_err_y.new_tensor(float("nan"))
 
-        # TODO(guy.rosman): change to match threshold to cur_horizon.
         results["misses_partial_x"][cur_horizon] = miss_mask(
             results["agent_fdes_x_partial"][cur_horizon], miss_thresholds_x_tensor
         )
@@ -530,7 +526,6 @@ def displacement_errors(
     results["fde"] = results["agent_fde"][~results["agent_fde"].isnan()].mean()
 
     # Compute square_error weighting each agent with the number of its observations.
-    # TODO(igor.gilitschenski): Discuss with Guy if we should average this in the same way we average other stats.
     # results["square_error"] = mean_traj_stats(results["agent_square_error"], agent_visibility.sum(2))
 
     # Take only timepoints where all agent positions are valid.
@@ -541,7 +536,6 @@ def displacement_errors(
     # Get a mask of last nonzero + following zero entries on rows.
     weights_fde = (weights == w1) * weights_ade
     # Weight the last nonzero entry (the rest should be zero).
-    # TODO(cyrushx): Change to a more explicit name?
     results["individual_fde_err"] = (
         weights_fde * (pos_norm_err.sum(1) / (relevant_agents.sum(1, keepdims=True) + 1e-20))
     ).sum(1)
@@ -606,7 +600,6 @@ def check_trajectory_traversal(
                 else:
                     # Trajectory intersects, return the negative of the distance between the deepest point of the
                     # trajectory and the crossing boundary
-                    # TODO profile use of shapely
                     internal_point_list = [
                         p
                         for p in map(geom.Point, trajectory_geom_scene.coords)

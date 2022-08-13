@@ -266,7 +266,6 @@ class VisualizationFunctor(object):
         super().__init__(params)
         self.annotation_query_filename = params["annotation_query"]
         self.parser = QueryParser()
-        # TODO: remove
         if not self.annotation_query_filename == "" and self.annotation_query_filename is not None:
             with open(self.annotation_query_filename, "r") as myfile:
                 data = myfile.read().replace("\n", "")
@@ -308,7 +307,6 @@ class VisualizationFunctor(object):
         print("pedestrian_intent_vector: {}".format(str(pedestrian_intent_vector)))
         print("pedestrian_awareness_vector: {}".format(str(pedestrian_awareness_vector)))
         source_tlog = reharvester_jsn["source_tlog"]
-        # TODO: use a relative path
         if not os.path.exists(source_tlog):
             print("tlog missing: " + os.path.exists(source_tlog))
         for name in ["q5-b", "q5-d", "q6", "q7", "q8", "q9"]:
