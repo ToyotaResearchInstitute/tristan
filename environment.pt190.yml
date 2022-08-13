@@ -1,0 +1,74 @@
+name: pt190
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - addict=2.4
+  - black=22.3
+  - boto3=1.18
+  - brotli=1.0
+  - colorama=0.4
+  - coverage=6.3
+  - cudatoolkit>=9.0, <11.7 # lower bound is for latest version on MacOSX
+  - cython=0.29
+  - fabric=2.7
+  - filelock=3.6
+  - geopy=2.2
+  - grpcio=1.41
+  - grpcio-tools=1.41
+  - holoviews=1.14
+  - ignite=0.4
+  - imageio=2.18
+  - imageio-ffmpeg=0.4
+  - invoke=1.7
+  - isort=5.10
+  - jinja2=3.0
+  - joblib=1.1
+  - jupyter=1.0
+  - matplotlib=3.4
+  - mkdocs=1.3
+  - mongodb=5.1
+  - more-itertools=8.12
+  - nbdime=3.1
+  - numpy=1.22
+  - opencv=4.5
+  - pandas=1.4
+  - pillow>=8.4, <9.0 # This cannot be upgraded until torch is upgraded
+  - pip=22.0
+  - plotly=5.7
+  - pre-commit=2.18
+  - protobuf=3.20
+  - psutil=5.9
+  - pymongo=4.1
+  - pyqt=5.12
+  - pytest=7.1
+  - pytest-mock=3.7
+  - pytest-xdist=2.5
+  - python=3.8
+  - pytorch=1.9
+  - pytorch-lightning=1.6
+  - scikit-learn=1.0
+  - scipy=1.8
+  - seaborn=0.11
+  - shapely=1.8
+  - simplejson=3.17
+  - skorch=0.11
+  - snakeviz=2.1
+  - tensorboard=2.8
+  - tensorboardx=2.5
+  - torchmetrics=0.8
+  - torchtext=0.10
+  - torchvision=0.2
+  - tqdm=4.64
+  - typeguard=2.13
+  - u-msgpack-python=2.7
+  - utm=0.7
+  - lz4
+  - pip:
+    - -e radutils
+    - -e triceps
+    - -e tristan
+    - -e .
+    - nvidia-ml-py3~=7.352.0
+    - pyquaternion~=0.9.9
+    - wandb~=0.12.15

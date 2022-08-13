@@ -1,0 +1,5 @@
+PARAM_MAX_AGENTS = "max_agents"
+PARAM_PAST_TIMESTEPS = "past_timesteps"
+PARAM_FUTURE_TIMESTEPS = "future_timesteps"
+PARAM_PAST_TIMESTEP_SIZE = "past_timestep_size"
+PARAM_FUTURE_TIMESTEP_SIZE = "future_timestep_size"
