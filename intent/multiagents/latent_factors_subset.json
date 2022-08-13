@@ -1,0 +1,57 @@
+[
+  {
+    "name": "to_be_crossing",
+    "id": 0,
+    "annotator_question": "q5_a_positive"
+  },
+  {
+    "name": "appear_to_be_crossing",
+    "id": 1,
+    "annotator_question": "q5_c_positive"
+  },
+  {
+    "name": "aware_of_ego_vehicle",
+    "id": 3,
+    "annotator_question": "q5_d_positive"
+  },
+  {
+    "name": "is_crossing",
+    "id": 4,
+    "annotator_question": "q10_a_i_positive"
+  },
+ {
+    "name": "is_looking_at_ego",
+    "id": 9,
+    "annotator_question": "q10_a_vi_positive"
+  },
+ {
+    "name": "is_facing_towards_ego",
+    "id": 11,
+    "annotator_question": "q10_a_ix_positive"
+  },
+ {
+    "name": "is_facing_away_from_ego",
+    "id": 12,
+    "annotator_question": "q10_a_x_positive"
+  },
+ {
+    "name": "is_body_facing_towards_ego",
+    "id": 13,
+    "annotator_question": "q10_a_ix_positive"
+  },
+ {
+    "name": "is_head_facing_towards_ego",
+    "id": 14,
+    "annotator_question": "q10_a_ix_positive"
+  },
+ {
+    "name": "is_near_crosswalk",
+    "id": 15,
+    "annotator_question": "q6_positive"
+  },
+ {
+    "name": "is_near_road",
+    "id": 16,
+    "annotator_question": "q7_positive"
+  }
+]

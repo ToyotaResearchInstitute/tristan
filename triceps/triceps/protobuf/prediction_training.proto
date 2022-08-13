@@ -1,0 +1,285 @@
+// Copyright 2020 Toyota Research Institute.  All rights reserved.
+// Data definition for prediction protobuf data - images and maps into trajectories and semantics.
+
+syntax = "proto3";
+
+package dgp.proto;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+service RadDrivingInterface {
+  rpc GetInference(PredictionSet) returns (PredictionSet) {}
+}
+
+// Basic time sample of an obstacle
+message TimestampedState  {
+  // Timestamp of this point sample.
+  google.protobuf.Timestamp timestamp = 1;
+  // Position of obstacle, 3-vector. Can ignore the last element ("z")
+  Point3D position = 2;
+  // Velocity of obstacle, 3-vector (repeated is used, but the length is not validated). Optional.
+  repeated float velocity = 3;
+  // Rotation matrix, if available, as quaternion 4-vector.
+  // Convention: q=( a + bi + cj + dk), with a>0 (similar to pygeometry)
+  repeated float rotation_aw = 4;
+  // Heading of the obstacle.
+  repeated float heading = 5;
+
+  // Dimensions of the dynamic obstacle / agent.
+  float width = 6;
+  float length = 7;
+  float height = 8;
+
+  // Uncertainty for each of the agents, for now agents are independent in each sample.
+  TimestampedStateUncertainty uncertainty_estimate = 9;
+
+  // Describes a scalar size in meters, can be the diameter/cross-section of the object.
+  float object_size = 10;
+}
+
+// Basic time sample of an obstacle
+message TimestampedStateUncertainty  {
+  // Covariance of the position of obstacle, a 3x3 matrix. For now, can ignore the last element ("z")
+  Covariance3D position_covariance = 1;
+  // Covariance of the velocity of the obstacle, a 3x3 matrix. For now, can ignore the last element ("z")
+  Covariance3D velocity_covariance = 2;
+}
+
+message RawImageData{
+  bytes data = 1;
+  // Width of the image.
+  int64 width = 2;
+  // Height of the image.
+  int64 height = 3;
+}
+
+message SensorImage{
+  // Filename storing the image
+  oneof data_source {
+    // For image files stored on disk.
+    string filename = 1;
+    // For data read from the message body.
+    RawImageData raw_data = 3;
+  }
+  string dgp_datum_id = 2;
+
+  // Specifies which kind of file/image format.
+  enum ImageFormatEnum {
+  Unknown = 0;
+  Bgr = 1;
+  Jpeg = 2;
+  }
+  ImageFormatEnum image_format = 4;
+}
+
+message TimestampedPredictionInput {
+  // Timestamp of this point sample.
+  google.protobuf.Timestamp timestamp = 1;
+  google.protobuf.Timestamp timestamp_end = 2;
+  SensorImage sensor_image_input = 3;
+  // The name of the source sensor of the image
+  string sensor_image_sensor_id = 4;
+  // Vector input with some semantic -- e.g pedals for egovehicle, PA vector for pedestrian, etc
+  repeated float vector_input = 5;
+  string vector_input_type_id = 6;
+  LocalMap local_map = 7;
+}
+
+message TrafficLightState {
+  string state_id = 1;
+  // The id of the map element for the state. Can refer to lanes or other map elements.
+  string map_element_id = 2;
+  // The state of the traffic light.
+  string state = 3;
+  // The start and stop time of the state interval.
+  google.protobuf.Timestamp timestamp_start = 4;
+  google.protobuf.Timestamp timestamp_end = 5;
+  // The stop point(s) for this traffic light state --
+  // positions that the agent should stop / not cross according to the state.
+  repeated Point3D stop_point =6;
+  // The source of the traffic light state inference (annotations, machine perception / platform, etc).
+  // Free-form text, can be a json.
+  string information_source = 7;
+  // Type of traffic light / control signal.
+  string traffic_light_type = 8;
+  // Additional information about the state. Usually as a json dictionary.
+  string additional_state_info = 9;
+}
+
+message TimestampedSemanticTarget {
+  // Timestamp of start point sample.
+  google.protobuf.Timestamp timestamp_start = 1;
+  // In an interval -- timestamp of end point sample.
+  google.protobuf.Timestamp timestamp_end = 2;
+  // Determines whether this is a point label in time, or an interval label.
+  bool is_interval = 3;
+  // The id of the agent that the semantic target refers to.
+  string agent_id = 4;
+  // The type id semantic target refers to (e.g. "pedestrian crossing")
+  string type_id = 5;
+  // Value of the target (e.g "pedestrian crossing" -> +/-1.0)
+  string value = 6;
+}
+
+message MapConnection {
+  // Identifier for the connecting map feature.
+  string id = 1;
+  // Type of connection, e.g. entry_lane, exit_lane, left_neighbor, right_neighbor, left_boundary, right_boundary.
+  string type = 2;
+  // Start and end segment index for self.
+  int32 start_index = 3;
+  int32 end_index = 4;
+  // Start and end segment index for the connecting lane, e.g. neighbor.
+  int32 other_start_index = 5;
+  int32 other_end_index = 6;
+}
+
+// Defines lane information - centerline, boundaries, etc.
+message Lane {
+  // Identifier for the lane.
+  string id = 1;
+  // List of center line segments.
+  repeated Segment center_line = 2;
+  // List of left lane boundary segments.
+  repeated Segment left_lane_boundary = 3;
+  // List of right lane boundary segments.
+  repeated Segment right_lane_boundary = 4;
+  // List of lane boundary segments without a left/right semantic.
+  repeated Segment lane_boundary = 5;
+  // List of map features that this lane connects to.
+  repeated MapConnection map_connections = 6;
+}
+
+// Define physical map feature with coordinates and types.
+message MapFeature {
+  // Identifier for the map feature.
+  string id = 1;
+  // List of polyline segments.
+  repeated Segment segments = 2;
+  // Speed limit of the map feature (for centerline only).
+  optional float speed_limit_mph = 3;
+  // Type of the map feature.
+  string type = 4;
+  // List of map features that this map feature connects to.
+  repeated MapConnection map_connections = 5;
+}
+
+// Trajectory of an obstacle
+message AgentTrajectory  {
+  // Identifier for the agent.
+  string agent_id = 1;
+  // Trajectory of the agent.
+  repeated TimestampedState trajectory = 2;
+  // Additional inputs for the agent - images, additional signals.
+  repeated TimestampedPredictionInput additional_inputs = 3;
+  // Additional information about the agent. Usually as a json dictionary.
+  string additional_agent_info = 4;
+}
+
+// Coordinate on the map
+message Point3D{
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+// 3D Covariance matrix. Positivity is not enforced.
+message Covariance3D{
+  float xx = 1;
+  float xy = 2;
+  float xz = 3;
+  float yy = 4;
+  float yz = 5;
+  float zz = 6;
+}
+
+// Represents a line segment for maps.
+message Segment{
+  Point3D start = 1;
+  Point3D end = 2;
+}
+
+// Defines zone information - type and polygon.
+message Zone {
+  // Identifier for the zone.
+  string id = 1;
+  string type = 2;
+  // Note: the polygon can be a polyline
+  repeated Segment polygon = 3;
+}
+
+// Represents a map -- either discrete segments or a pointer to an external data object (e.g. for rasterized maps).
+message LocalMap {
+  // Lanes list.
+  repeated Lane lanes = 1;
+  // List of zones, such as crosswalk regions.
+  repeated Zone zones = 2;
+  // An id to store reference to map files and position in them. Format is a json, fields are not specified.
+  string external_map_id = 3;
+  // A general encoding of map information
+  google.protobuf.Any map_data = 4;
+  string map_metainfo = 5;
+  // List of physical map features, including lane center, road edge, road line, stop sign, crosswalk, speed bump, etc.
+  repeated MapFeature map_features = 6;
+}
+
+message PredictionInstance {
+  // Identifier of the instance.
+  string instance_id = 1;
+
+  // Per-agent information, such as trajectories, images.
+  map<string, AgentTrajectory> agent_trajectories = 2;
+
+  // Per-agent information, such as trajectories, images.
+  LocalMap map_information = 3;
+
+  repeated TimestampedSemanticTarget semantic_targets = 4;
+  string egovehicle_id = 5;
+
+  // This is the time in the snippet which is considered the "current moment" at which we predict.
+  // Note this may be arbitrarily shifted, along with all timestamps in the agent_trajectories, semantic_targets, prediction_instance_info to deidentify the prediction sample.
+  google.protobuf.Timestamp prediction_time = 6;
+
+  // Additional information about this instance. Undefined form (possible store a json).
+  // This should not store personally identifiable information, but can hold some time information: time of day, day of week, but not date / unix time.
+  string prediction_instance_info = 7;
+
+  // Specific field on whether this instance is from a background distribution or not.
+  // Example: if the dataset is for pedestrian prediction, we may need to balance "rare events" collected by the filter
+  // with general/background behavior.
+  bool is_leaked = 8;
+
+  // The timepoint of the source data collection. (e.g. when did we see this example)
+  // This can be removed to deidentify the prediction sample.
+  google.protobuf.Timestamp source_prediction_time = 9;
+
+  // Additional information about this instance that can identify people. Undefined form (possible store a json).
+  // This can hold for example date / full timestamp / unix time.
+  string prediction_instance_pii_info = 10;
+
+  repeated AdditionalSceneDatum additional_scene_info = 11;
+
+}
+
+message AdditionalSceneDatum {
+  oneof DatumUnion {
+    string general_scene_datum = 1;
+    TrafficLightState traffic_light_states = 2;
+  }
+}
+
+message PredictionSetInformation {
+  // Additional information about the set that does not breach people's privacy.
+  string data_source = 1;
+  google.protobuf.Timestamp creation_time = 2;
+  string city = 3;
+}
+
+message PredictionSet{
+  repeated PredictionInstance prediction_instances = 1;
+  PredictionSetInformation information = 2;
+  repeated float instance_weights = 3;
+// nuScenes (partially supported),
+// interaction dataset, DFS.
+}
