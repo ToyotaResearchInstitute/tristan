@@ -45,3 +45,5 @@ conda activate pt190
 
 ## License
 See the `LICENSE.md` file for details.
+
+Copyright 2018-2022 TRI.
