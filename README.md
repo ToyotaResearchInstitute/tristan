@@ -1,7 +1,7 @@
 # RAD Research Public Repo
 
 This repository contains the code for the papers published with the Risk Aware Driving (RAD) team at Toyota Research Institute (TRI), including, but not limited to: 
-
+Xin Huang, Rui Yu, Guy Rosman, Deepak Gopinath, Stephen G. McGill, Igor Gilitschenski, Xiongyi Cui, Yen-Ling Kuo, Thomas Balch, Paul Drews, Mark Flanagan, Caleb Severn, Nicholas Guyett, Justin Lidard.
 
 
 ## Overview
