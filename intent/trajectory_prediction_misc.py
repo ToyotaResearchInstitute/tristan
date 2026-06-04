@@ -584,7 +584,7 @@ def trajectory_pred_argument_setter(parser):
         "--map-mask-distance-threshold",
         type=float,
         default=0.0,
-        help="Distance threshold (in meter) to decide what map points to use. Default 0.0 means no threshold. At 100 meters, the memory reduces by 22.6% at the cost of 2.6% FDE decrease.",
+        help="Distance threshold (in meter) to decide what map points to use. Default 0.0 means no threshold. At 100 meters, the memory reduces by 22.6%% at the cost of 2.6%% FDE decrease.",
     )
     parser.add_argument("--map-polyline-feature-degree", type=int, default="0", help="Degree of map polyline feature.")
     parser.add_argument(

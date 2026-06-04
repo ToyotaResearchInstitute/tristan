@@ -30,6 +30,7 @@ from triceps.protobuf.prediction_dataset_synthetic import generate_synthetic_dat
 from triceps.protobuf.proto_arguments import nullable_str, verify_and_update_arg
 
 DEFAULT_NUM_WORKERS = min(64, multiprocessing.cpu_count())
+BENCHMARK_GPU_NUM_EPOCHS = 2
 
 # The agent types considered in the predictor by default.
 # Those correspond to numeric values [2, 3, 4, 5, 6, 7]

@@ -716,6 +716,7 @@ def interpolate_nearest_timestamp(timestamps, params):
 def select_agent(
     params: dict,
     positions: np.ndarray,
+    positions_full: np.ndarray,
     is_ego_vehicle: np.ndarray,
     is_relevant_agent: np.ndarray,
     dot_keys: np.ndarray,
@@ -777,6 +778,9 @@ def select_agent(
     new_positions = np.zeros(
         (total_timestamps, params[protobuf_training_parameter_names.PARAM_MAX_AGENTS], positions.shape[2])
     )
+    new_positions_full = np.zeros(
+        (positions_full.shape[0], params[protobuf_training_parameter_names.PARAM_MAX_AGENTS], positions_full.shape[2])
+    )
     new_is_ego = np.zeros(params[protobuf_training_parameter_names.PARAM_MAX_AGENTS])
     new_is_rel = np.zeros(params[protobuf_training_parameter_names.PARAM_MAX_AGENTS])
     new_dot_keys = np.zeros(params[protobuf_training_parameter_names.PARAM_MAX_AGENTS])
@@ -818,6 +822,7 @@ def select_agent(
             new_is_rel[0] = 1
 
         new_positions[:, 0, :] = positions[:, new_idx, :]
+        new_positions_full[:, 0, :] = positions_full[:, new_idx, :]
         new_dot_keys[0] = dot_keys[new_idx]
         new_agent_type_vector[0, :] = agent_type_vector[new_idx, :]
 
@@ -839,6 +844,7 @@ def select_agent(
             else:
                 new_idx = np.hstack((idx_ego, idx_rel, idx_others))
         new_positions[:, :num_agent, :] = positions[:, new_idx, :]
+        new_positions_full[:, :num_agent, :] = positions_full[:, new_idx, :]
         new_is_ego[:num_agent] = is_ego_vehicle[new_idx]
         new_is_rel[:num_agent] = is_relevant_agent[new_idx]
         new_dot_keys[:num_agent] = dot_keys[new_idx]
@@ -908,6 +914,7 @@ def select_agent(
         new_is_rel = is_relevant_agent[new_idx]
 
         new_positions = positions[:, new_idx, :]
+        new_positions_full = positions_full[:, new_idx, :]
         new_dot_keys = dot_keys[new_idx]
         new_agent_type_vector = agent_type_vector[new_idx, :]
 
@@ -929,6 +936,7 @@ def select_agent(
 
     return (
         new_positions,
+        new_positions_full,
         new_is_ego,
         new_is_rel,
         new_dot_keys,

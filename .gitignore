@@ -10,6 +10,8 @@ __pycache__
 *.mp4
 *.log
 
+build/
+
 # File lists
 intent.public_repo_filelist.txt
 intent.sg_filelist.txt

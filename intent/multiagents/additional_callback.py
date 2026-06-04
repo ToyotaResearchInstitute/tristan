@@ -1,5 +1,6 @@
+import abc
 from abc import ABC
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 import matplotlib
 import matplotlib.figure
@@ -8,12 +9,41 @@ import numpy as np
 import torch
 import tqdm
 
+from intent.multiagents import trainer_visualization
+
 MatplotlibColor = Union[str, Tuple[float, float, float]]
 
 
 class AdditionalModelCallback(ABC):
     def __init__(self) -> None:
         """A generic interface to handle additional structure in prediction model."""
+
+    def update_costs(
+        self,
+        additional_stats: dict,
+        params: dict,
+        predicted: dict,
+        expected: dict,
+        future_encoding: torch.Tensor,
+        extra_context: dict,
+    ) -> None:
+        """Compute the cross-entropy loss of the generated token sequence.
+
+        Parameters
+        ----------
+        additional_stats : dict
+            A dictionary of the additional costs.
+        params : dict
+            A parameters dictionary.
+        predicted : dict
+            A dictionary of predicted values
+        expected : dict
+            A dictionary of expected values.
+        future_encoding : dict
+            A dictionary with additional encoding information for the future prediction.
+        extra_context : dict
+            A dictionary that provides extra context for computing costs.
+        """
 
     def augment_sample_index(self, trainer_param: dict, sample_indices: list):
         """
@@ -111,7 +141,9 @@ class AdditionalModelCallback(ABC):
         """
         return data_cost
 
-    def update_agent_additional_inputs(self, agent_additional_inputs: dict, transforms: torch.Tensor, normalizer):
+    def update_agent_additional_inputs(
+        self, batch, agent_additional_inputs: dict, transforms: torch.Tensor, normalizer
+    ):
         """
         Callback function to update agent additional inputs.
 
@@ -127,7 +159,7 @@ class AdditionalModelCallback(ABC):
         pass
 
     def update_prediction_stats(
-        self, param: dict, stats: [], is_valid: torch.Tensor, sample_size: int, transforms: torch.Tensor, normalizer
+        self, param: dict, stats: list, is_valid: torch.Tensor, sample_size: int, transforms: torch.Tensor, normalizer
     ):
         """
         Callback function to update prediction stats.
@@ -160,6 +192,9 @@ class AdditionalTrainerCallback(ABC):
             A dictionary of training parameters.
         """
         self.params = params
+
+    def get_additional_dataloader_info(self, ctx, dataloader_info, other_inputs):
+        pass
 
     def update_statistic_keys(self, statistic_keys: list) -> None:
         """
@@ -225,7 +260,10 @@ class AdditionalTrainerCallback(ABC):
         """
         pass
 
-    def update_solution(self, solution: dict, predicted: dict, batch_idx: int):
+    def update_batch_item_before_training(self, ctx, batch_item, other_inputs):
+        pass
+
+    def update_solution(self, solution: dict, predicted: dict, batch_idx: int, batch_itm: dict = None):
         """
         Callback function to add additional states to solution.
 
@@ -237,6 +275,8 @@ class AdditionalTrainerCallback(ABC):
             Dictionary of prediction.
         batch_idx : int
             Batch index.
+        batch_itm : dict
+            Dictionary containing the batch item.
         """
         pass
 
@@ -311,24 +351,6 @@ class AdditionalTrainerCallback(ABC):
             Number of future time steps.
         """
         pass
-
-    def update_save_validation_criterion_key(self, trainer_param: dict) -> list:
-        """
-        Callback function to overwrite save_validation_criterion_key in prediction_trainer.
-
-        Parameters
-        ----------
-        trainer_param : dict
-            Dictionary of trainer parameters.
-
-        Returns
-        -------
-        save_validation_criterion_key : str
-            Criterion key for saving in validation.
-        folder_postfix : str
-            Postfix of folder to save.
-        """
-        return []
 
     def update_visualization_text(
         self, cost_str: str, solution: dict, batch: dict, batch_idx: int, num_past_points: int
@@ -406,7 +428,7 @@ class AdditionalTrainerCallback(ABC):
         """
         pass
 
-    def visualize_additional_info(self, solution: dict, fig: matplotlib.figure.Figure):
+    def visualize_additional_info(self, solution: dict, fig: matplotlib.figure.Figure, ax, batch, batch_idx):
         """Visualize additional info of a solution.
 
         Parameters
@@ -431,7 +453,7 @@ class AdditionalTrainerCallback(ABC):
 
     def update_statistics(
         self,
-        statistic_keys: [],
+        statistic_keys: list,
         statistics: dict,
         logger,
         dataloader_type: str,
@@ -454,3 +476,129 @@ class AdditionalTrainerCallback(ABC):
             Global batch count.
         """
         pass
+
+
+class CustomVisualizationCallback(ABC):
+    """
+    A class to handle generation of custom images
+
+    """
+
+    def __init__(self, params):
+        self.params = params
+
+    def visualize_custom_process(
+        self,
+        batch_itm_idx,
+        batch_size,
+        batch_itm,
+        result,
+        g_stats,
+        cost,
+        param,
+        summary_writer,
+        iter,
+        tag_prefix,
+        predicted_semantics,
+        visualization_callbacks,
+    ):
+        """
+        Callback function to plot and log custom images
+        Parameters
+        ----------
+        batch_itm_idx
+        batch_size
+        batch_itm
+        result
+        g_stats
+        cost
+        param
+        summary_writer
+        iter
+        tag_prefix
+        predicted_semantics
+        visualization_callbacks
+
+        Returns
+        -------
+
+        """
+
+        fig_handle_dict = self.make_custom_fig(
+            batch_itm_idx,
+            batch_size,
+            batch_itm,
+            result,
+            g_stats,
+            cost,
+            param,
+            summary_writer,
+            iter,
+            tag_prefix,
+            predicted_semantics,
+            visualization_callbacks,
+        )
+
+        self.log_fig(summary_writer, fig_handle_dict, param, tag_prefix, iter)
+
+    @abc.abstractmethod
+    def make_custom_fig(
+        self,
+        batch_itm_idx,
+        batch_size,
+        batch_itm,
+        result,
+        g_stats,
+        cost,
+        param,
+        summary_writer,
+        iter,
+        tag_prefix,
+        predicted_semantics,
+        visualization_callbacks,
+    ) -> Dict[str, "fig"]:
+        """
+        Callback function to generate and return the figure to plot
+
+        Parameters
+        ----------
+        batch_itm_idx
+        batch_size
+        batch_itm
+        result
+        g_stats
+        cost
+        param
+        summary_writer
+        iter
+        tag_prefix
+        predicted_semantics
+        visualization_callbacks
+
+        Returns
+        -------
+        Dictionary mapping logger keys -> matplotlib.figure.Figurec handle
+        """
+        pass
+
+    def log_fig(self, summary_writer, fig_handle_dict, param, tag_prefix, iter):
+        """
+        Callback function to log the custom figures as an image.
+
+        Parameters
+        ----------
+        summary_writer
+        fig_handle_dict
+        param
+        iter
+
+        Returns
+        -------
+
+        """
+        if fig_handle_dict is None:
+            return
+        for fig_name, fig in fig_handle_dict.items():
+            img = trainer_visualization.get_img_from_fig(fig, image_format=param["visualization_image_format"])
+            plt.close(fig)
+            summary_writer.add_image(f"{tag_prefix}/{fig_name}", img.transpose(2, 0, 1), global_step=iter)

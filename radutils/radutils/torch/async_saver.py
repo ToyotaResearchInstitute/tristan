@@ -1,11 +1,14 @@
 import logging
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import threading
 import time
-from typing import Dict, List, Optional
+from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 import torch
 from typeguard import typechecked
@@ -18,6 +21,20 @@ except ModuleNotFoundError:
     # In public repo, set your own s3 path here, e.g. s3://...
     SAVED_MODEL_S3_PREFIX = ""
     SAVED_ARTIFACT_S3_PREFIX = ""
+
+DEFAULT_ROLLING_SAVES = 5
+
+
+class ResumeStrategy(Enum):
+    BEST = "best"  # Best according to early stopping criterion
+    LAST = "last"
+
+    def __str__(self):
+        return self.value
+
+
+DEFAULT_RESUME_STRATEGY = ResumeStrategy.LAST
+DEFAULT_SAVE_STRATEGY = ResumeStrategy.LAST
 
 
 @typechecked
@@ -54,7 +71,6 @@ def sync_model_to_s3(folder: str) -> None:
     """This is called at every checkpoint"""
     print(f"Syncing models for directory {folder}")
     folder = os.path.normpath(folder)
-    # This may also be post fixed, such as with _best_fde
     session_name = os.path.basename(folder)
     s3_url = f"{SAVED_MODEL_S3_PREFIX}/{session_name}"
     sync_to_s3(folder, s3_url)
@@ -106,21 +122,17 @@ def sync_model_and_artifacts_to_s3(session_id: str) -> None:
 
 
 @typechecked
-def sync_model_from_s3_command(
-    session_name: str, path_to_model_directory: str, use_best_fte: bool = True
-) -> [str, str]:
+def sync_model_from_s3_command(session_name: str, path_to_model_directory: str) -> Tuple[str, str]:
     s3_url = os.path.join(SAVED_MODEL_S3_PREFIX, session_name)
-    if use_best_fte:
-        s3_url = f"{s3_url}_best_fde"
     folder = os.path.join(path_to_model_directory, session_name)
     command = f"aws s3 sync {s3_url} {folder}"
     return command, folder
 
 
 @typechecked
-def sync_models_from_s3(session_names: List[str], path_to_model_directory: str, use_best_fte: bool = True) -> None:
+def sync_models_from_s3(session_names: List[str], path_to_model_directory: str) -> None:
     for session_name in session_names:
-        command, folder = sync_model_from_s3_command(session_name, path_to_model_directory, use_best_fte)
+        command, folder = sync_model_from_s3_command(session_name, path_to_model_directory)
         if os.path.exists(folder):
             # If local session folder exist, don't sync from s3
             print(f"Local model exists in folder {folder}, won't download from s3")
@@ -130,12 +142,76 @@ def sync_models_from_s3(session_names: List[str], path_to_model_directory: str, 
         subprocess.run(command, stdout=sys.stdout, stderr=sys.stderr, universal_newlines=True, shell=True, check=True)
 
 
+def update_rolling_backups(fname: str, num_rolling_saves: int):
+    """Save a copy of a file, up to num_rolling_saves copies."""
+    for idx in reversed(range(num_rolling_saves - 1)):
+        extant_rolling_save = Path(f"{fname}-{idx}")
+        if extant_rolling_save.exists():
+            extant_rolling_save.rename(f"{fname}-{idx+1}")
+    orig_file = Path(fname)
+    if orig_file.exists():
+        orig_file.rename(f"{fname}-1")
+
+
 @typechecked
+def get_previous_basename(basename: str, previous_version: int = 0) -> str:
+    if previous_version:
+        basename = f"{basename}-{previous_version}"
+    return basename
+
+
+@typechecked
+def get_model_save_basename(
+    model_name: str, strategy: Optional[ResumeStrategy] = None, previous_version: int = 0
+) -> str:
+    if strategy is None:
+        strategy = DEFAULT_SAVE_STRATEGY
+    basename_suffix = ""
+    if strategy == ResumeStrategy.BEST:
+        basename_suffix = f".{ResumeStrategy.BEST}"
+    basename = f"model_{model_name}{basename_suffix}.pth"
+    basename = get_previous_basename(basename, previous_version)
+    return basename
+
+
+@typechecked
+def get_checkpoint_basename(strategy: Optional[ResumeStrategy] = None, previous_version: int = 0) -> str:
+    if strategy is None:
+        strategy = DEFAULT_SAVE_STRATEGY
+    basename_suffix = ""
+    if strategy == ResumeStrategy.BEST:
+        basename_suffix = f".{ResumeStrategy.BEST}"
+    basename = f"checkpoint{basename_suffix}.tar"
+    basename = get_previous_basename(basename, previous_version)
+    return basename
+
+
+@typechecked
+def get_epoch_stamped_basename(basename: str, epoch: int) -> str:
+    """Return a human-epoch-stamped save filename while preserving the original suffix."""
+    human_epoch = epoch + 1
+    path = Path(basename)
+    return f"{path.stem}.epoch{human_epoch:04d}{path.suffix}"
+
+
+def _link_or_copy(src: str, dst: str) -> None:
+    """Create a cheap stable alias when possible, falling back to a copy."""
+    dst_path = Path(dst)
+    if dst_path.exists():
+        dst_path.unlink()
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+
+
 def save_models(
     models_state_dict: Dict,
     checkpoint: Optional[Dict],
     folder: str,
     save_to_s3: bool,
+    strategy: Optional[ResumeStrategy] = DEFAULT_SAVE_STRATEGY,
+    num_rolling_saves=DEFAULT_ROLLING_SAVES,
 ) -> None:
     """Save model state_dict and checkpoint.
     models_state_dict: dict
@@ -144,6 +220,10 @@ def save_models(
         The checkpoint includes the state_dict for optimizer, epoch info
     folder: str
         The dir to save the model
+    strategy: ResumeStrategy
+        For saving different variants of a model; eg "best"
+    num_rolling_saves: int
+        Retain this many old copies of the saved model files; each file will be suffixed with a counter
     """
     print("Saving model to {}".format(folder))
     if os.environ.get("RAD_INTERRUPT_ACTIVE"):
@@ -152,12 +232,26 @@ def save_models(
         return
 
     os.makedirs(folder, exist_ok=True)
+    saved_model_files = []
     for model_name, model_state_dict in models_state_dict.items():
-        fname_model = os.path.join(folder, "model_{}.pth".format(model_name))
+        model_basename = get_model_save_basename(model_name, strategy)
+        fname_model = os.path.join(folder, model_basename)
+        update_rolling_backups(fname_model, num_rolling_saves)
         torch.save(model_state_dict, fname_model)
+        saved_model_files.append((model_basename, fname_model))
     if checkpoint:
-        fname_checkpoint = os.path.join(folder, "checkpoint.tar")
+        checkpoint_basename = get_checkpoint_basename(strategy)
+        fname_checkpoint = os.path.join(folder, checkpoint_basename)
+        update_rolling_backups(fname_checkpoint, num_rolling_saves)
         torch.save(checkpoint, fname_checkpoint)
+        if "epoch" in checkpoint:
+            epoch = checkpoint["epoch"]
+            checkpoint_epoch_basename = get_epoch_stamped_basename(checkpoint_basename, epoch)
+            _link_or_copy(fname_checkpoint, os.path.join(folder, checkpoint_epoch_basename))
+            for model_basename, fname_model in saved_model_files:
+                model_epoch_basename = get_epoch_stamped_basename(model_basename, epoch)
+                _link_or_copy(fname_model, os.path.join(folder, model_epoch_basename))
+            print(f"Saved epoch-stamped model aliases for epoch {epoch + 1}: {checkpoint_epoch_basename}")
     if save_to_s3:
         sync_model_to_s3(folder)
 
@@ -176,7 +270,7 @@ class AsyncModelSaver(threading.Thread):
     The saver thread will check if there's any model saved, then do the writing, then loop over.
     """
 
-    def __init__(self, timeout: int = 10):
+    def __init__(self, rolling_saves=DEFAULT_ROLLING_SAVES, timeout: int = 10):
         super().__init__(daemon=True)
         self._pending_models_state_dict = {}
         self._pending_checkpoint = {}
@@ -185,6 +279,7 @@ class AsyncModelSaver(threading.Thread):
         self.should_stop = False
         self.wait_period = 1
         self.timeout = timeout
+        self.num_rolling_saves = rolling_saves
         self.start()
 
     def set_model_to_save(
@@ -193,6 +288,7 @@ class AsyncModelSaver(threading.Thread):
         checkpoint: Optional[Dict],
         folder: str,
         save_to_s3: bool,
+        strategy: Optional[ResumeStrategy] = None,
     ):
         """Set the model to be saved.
         Note: The newly set model will override the current set model, pending to save (but not yet saved).
@@ -211,7 +307,7 @@ class AsyncModelSaver(threading.Thread):
             # Override current pending model.
             self._pending_models_state_dict[folder] = models_state_dict
             self._pending_checkpoint[folder] = checkpoint
-            self._options[folder] = {"save_to_s3": save_to_s3}
+            self._options[folder] = {"save_to_s3": save_to_s3, "strategy": strategy}
 
     def save_model_sync(
         self,
@@ -219,6 +315,7 @@ class AsyncModelSaver(threading.Thread):
         checkpoint: Optional[Dict],
         folder: str,
         save_to_s3: bool,
+        strategy: Optional[ResumeStrategy] = None,
     ):
         models_state_dict = {}
         for model_name, model in models.items():
@@ -227,7 +324,14 @@ class AsyncModelSaver(threading.Thread):
             # Copy model state_dict without move model from cuda to cpu.
             models_state_dict[model_name] = {k: param for k, param in model.state_dict().items()}
 
-        save_models(models_state_dict, checkpoint, folder, save_to_s3)
+        save_models(
+            models_state_dict,
+            checkpoint,
+            folder,
+            save_to_s3,
+            strategy=strategy,
+            num_rolling_saves=self.num_rolling_saves,
+        )
 
     def run(self):
         """Saver thread loop.
@@ -249,7 +353,13 @@ class AsyncModelSaver(threading.Thread):
                 if model_to_save:
                     # Note, there's only one thread does the writing (this thread), so no lock is needed.
                     for folder in model_to_save:
-                        save_models(model_to_save[folder], checkpoints.get(folder, None), folder, **options[folder])
+                        save_models(
+                            model_to_save[folder],
+                            checkpoints.get(folder, None),
+                            folder,
+                            **options[folder],
+                            num_rolling_saves=self.num_rolling_saves,
+                        )
                 time.sleep(self.wait_period)
             except Exception as e:
                 logging.error("Error in AsyncModelSaver, error: %s", str(e))

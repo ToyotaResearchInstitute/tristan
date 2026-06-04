@@ -21,6 +21,7 @@ See [prediction_framework_overview.pdf](prediction_framework_overview.pdf) for a
 See below in order to run the code for each paper under `intent/multiagents/`:
 * [`hybrid`](./intent/multiagents/hybrid/README.md) - Code for "HYPER: Learned Hybrid Trajectory Prediction via Factored Inference and Adaptive Sampling", paper by: Xin Huang, Guy Rosman, Igor Gilitschenski and Ashkan Jasour and Stephen G. McGill, John J. Leonard and Brian C. Williams.
 * [`language`](./intent/multiagents/language/README.md) - Code for "Trajectory Prediction with Linguistic Representations", paper by Yen-Ling Kuo, Xin Huang, Andrei Barbu, Stephen G. McGill, and Boris Katz and John J. Leonard and Guy Rosman.
+* [`merge filtering`](./intent/multiagents/merge_filtering.md) - Running the Waymo interactive `merge`(yield) filter and writing filter-result JSON.
 
 # Development environment
 

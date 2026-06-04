@@ -1,9 +1,10 @@
 import json
-from collections import OrderedDict
+import math
+from collections import OrderedDict, defaultdict
 from typing import Any, Tuple
 
 import numpy as np
-from scipy import stats
+from scipy import ndimage, stats
 from scipy.interpolate import interp1d
 from shapely.geometry import LinearRing, LineString, Point
 
@@ -54,6 +55,7 @@ def is_condition_tested_worst_cases(obj, statistics_json, slice_names, group_typ
     """
     Compares the json object's fname and timestamp to statistics_json, getting the worst examples according to
     group type, for the slice names (e.g, nll_highest for all slices)
+    TODO: replace with a more general comparison to match adovehicles or other data instances
     :param obj:
     :param statistics_json:
     :param slice_names:
@@ -61,6 +63,7 @@ def is_condition_tested_worst_cases(obj, statistics_json, slice_names, group_typ
     :return:
     """
     result = False
+    # TODO: check condition logic for searching over json
     assert "slice_results" in statistics_json
     slices = statistics_json["slice_results"]
     if slice_names is None or not slice_names:
@@ -110,6 +113,7 @@ def is_condition_stop_m(res, past_horizon=23, future_horizon=23):
     future_traj_sqr_diff = [dist_sqr(future_traj[i], future_traj[i + 1]) for i in np.arange(future_horizon - 1)]
     # print("future_traj_sqr_diff")
     # print(future_traj_sqr_diff)
+    # TODO: Won't get _quite_ to zero
     return np.count_nonzero(future_traj_sqr_diff) < future_horizon * 4 / 5
 
 
@@ -316,7 +320,9 @@ def predicate_filter(agent_trajectories: OrderedDict, scene_information: dict, p
     return None
 
 
-def create_duration_label(name: str, start_time: float, end_time: float, subject: str = None):
+def create_duration_label(
+    name: str, start_time: float, end_time: float, subject: str = None, value: float = None, **kwargs
+):
     """Create the output dictionary given the label and duration for the label.
 
     Parameters
@@ -335,7 +341,7 @@ def create_duration_label(name: str, start_time: float, end_time: float, subject
     out: dict
         The output dictionary for a filter.
     """
-    out = {"label": name, "start_time": start_time, "end_time": end_time}
+    out = {"label": name, "start_time": start_time, "end_time": end_time, "value": value, **kwargs}
     if subject is not None:
         out["subject"] = subject
     return out
@@ -382,7 +388,7 @@ def turn_filter(agent_trajectories: OrderedDict, scene_information: dict, params
     tokens = []
     current_token = None
     timestamps = []
-    for t in range(theta_diff.shape[0]):
+    for t in range(window_size, theta_diff.shape[0] - window_size, 3):
         t_start = t - window_size if t - window_size > 0 else 0
         t_end = t + window_size if t + window_size < theta.shape[0] else theta.shape[0]
         theta_diff_before = theta_diff[t_start:t]
@@ -421,6 +427,88 @@ def turn_filter(agent_trajectories: OrderedDict, scene_information: dict, params
                 timestamps = []
     if current_token is not None:
         tokens.append(create_duration_label(current_token, timestamps[0], timestamps[-1]))
+    return tokens
+
+
+def turn_filter2(agent_trajectories: OrderedDict, scene_information: dict, params: dict) -> list:
+    """Filter if the given agent is turning left or right.
+
+
+    Parameters
+    ----------
+    agent_trajectories: OrderedDict
+        A map from agent_id to a Nx3 float array of positions over time, (x,y,t).
+    scene_information: dict
+        Scene information, has map_elements->OrderedDict as a field.
+    params: dict
+        The parameter dictionary for the filter, including the following keys.
+        turn_direction: int
+            1 for left turn, -1 for right turn
+        turn_deg_low: float
+            The lower bound of the turn degree accumulated over certain amount of time.
+            At least one windows need to have more degree to activate the filter.
+        window_size_low: int
+            The window size for the degree lower bound, the amount of time is window_size_low*time_step_size
+        turn_deg_high: float
+            The higher bound of the turn degree accumulated over certain amount of time.
+            All of the windows have smaller degree to activate the filter.
+        window_size_high: int
+            The window size for the degree higher bound, the amount of time is window_size_high*time_step_size
+
+    Returns
+    -------
+    tokens: list
+        A list of dictionaries that include label and timestamps indicating the duration for the turns.
+    """
+    time_step_size = params["time_step_size"]
+    window_size_low = params["window_size_low"]
+    window_size_high = params["window_size_high"]
+    turn_deg_low = params["turn_deg_low"]
+    turn_deg_high = params["turn_deg_high"]
+    turn_direction = params["turn_direction"]  # 1 for left turn, -1 for right turn
+    # TODO(xiongyi.cui) Pass in time step size rather than assuming 10Hz.
+    # Smaller movement in a second will be discarded when computing heading velocity.
+    # This is much lower than normal walking speed, which is about 1.4 m/s.
+    tiny_movement_threshold_meter = 0.35
+    # Max angular velocity for vehicles, per second.
+    max_angular_velocity_deg = 180
+
+    tiny_movement_per_timestamp = tiny_movement_threshold_meter * time_step_size
+    max_angular_velocity_deg_per_timestamp = max_angular_velocity_deg * time_step_size
+
+    agent_traj = list(agent_trajectories.values())[0]
+    move_dist = (agent_traj[1:, 1] - agent_traj[:-1, 1]) ** 2 + (agent_traj[1:, 0] - agent_traj[:-1, 0]) ** 2
+    small_move_idx = move_dist < tiny_movement_per_timestamp**2
+    # Compute heading.
+    theta = np.arctan2(agent_traj[1:, 1] - agent_traj[:-1, 1], agent_traj[1:, 0] - agent_traj[:-1, 0])
+    theta = np.degrees(theta)
+
+    # Compute angular velocity.
+    theta_diff = theta[1:] - theta[:-1]
+    theta_diff[theta_diff < -180] += 360
+    theta_diff[theta_diff > 180] -= 360
+    # Reset theta diff when the movement is tiny
+    theta_diff[small_move_idx[:-1]] = 0
+    # avoid jitter
+    theta_diff = np.clip(theta_diff, -max_angular_velocity_deg_per_timestamp, max_angular_velocity_deg_per_timestamp)
+    # Compute heading
+    theta_accu = np.add.accumulate(theta_diff)
+
+    theta_turn_low = theta_accu[window_size_low:] - theta_accu[:-window_size_low]
+    theta_turn_high = theta_accu[window_size_high:] - theta_accu[:-window_size_high]
+
+    # agent must turn enough.
+    idx_low = turn_direction * theta_turn_low > turn_deg_low
+    turn_enough_count = np.sum(idx_low)
+    # agent can't overturn.
+    idx_high = turn_direction * theta_turn_high > turn_deg_high
+    turn_too_much_count = np.sum(idx_high)
+    tokens = []
+
+    if turn_too_much_count == 0 and turn_enough_count > 0:
+        current_token = "Turn"
+        first_timestamp = int(np.where(idx_low == True)[0][0])
+        tokens.append(create_duration_label(current_token, first_timestamp, first_timestamp + window_size_low))
     return tokens
 
 
@@ -817,8 +905,8 @@ def find_points_in_region(positions: np.ndarray, region: LineString):
     return out
 
 
-def yield_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict, params: dict) -> list:
-    """If agent1 and agent2 start on different paths, end up in the same path, and agent2 gets first to the joint part of the path.
+def conservative_yield_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict, params: dict) -> list:
+    """If agent1 and agent2 start on different paths, end up in the same path, and agent2 gets first to the joint part of the path; compared to yield, with looser conditions on the distance maintained and the motion profile, and a parameter to contribute to close merge
 
     Parameters
     ----------
@@ -829,14 +917,224 @@ def yield_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict
         Scene information, has map_elements->OrderedDict as a field.
     params: dict
         Parameters:
-        yielding_prefix - minimal threshold to verify that the trajectories are long enough
-        yielding_dt - delta t (timepoints) used to estimate speed change
-        yielding_time_gap - the time gap between agent 1 and agent 2 reaching the intersection point
+        yielding_prefix - minimal threshold (meters) to verify that the trajectories are long enough
+        merge_time_threshold - the time threshold to filter the arrival timing difference between agent 1 and agent 2 at intersection point (small being close merge, large being regular merge)
+        projected_merge_time_threshold - maximal threshold of the projected merge timing difference between agent 2 and agent 1 non-yielding projected motion, for agent 1 to be considered valid / reasonable / necessary / not overly conservative
+        stop_speed_criteria - maximal yielding speed to be considered as yielding at intersections (which require explicit stopping)
+
 
     Returns
     -------
     token_list: list
-        A list of tokens detected ("yield").
+        A list of tokens detected ("conservative-yield").
+    """
+    if len(list(agent_trajectories.values())) < 2:
+        return []
+
+    def compute_trajectory_stats(traj, dilation):
+        """Compute trajectory stats needed for yielding"""
+        positions = traj[:, :2]
+        v = positions[1:, :] - positions[:-1, :]
+        v = np.concatenate((v, v[-2:-1, :]), axis=0)
+        spd1 = (v**2).sum(1)
+        t = traj[:, 2]
+        sl = LineString(positions.tolist()).buffer(dilation)
+        return positions, spd1, t, sl
+
+    target_agent_id = list(agent_trajectories.keys())[0]
+    target_agent_traj = agent_trajectories[target_agent_id]
+    yielding_dilation_radius = params["yielding_dilation_radius"]
+
+    positions1, spd1, t1, sl1 = compute_trajectory_stats(target_agent_traj, yielding_dilation_radius)
+
+    def moving_window_spd_estimate(spd1, sw):
+        # check speed estimate smoothness
+        acc_thr = 7.5
+        _s_cache = spd1[:sw]
+        sspd1 = np.array(np.mean(_s_cache))
+        for _s in spd1[sw:]:
+            _s_cache = _s_cache[1:]
+            _s_cache = np.append(_s_cache, _s)
+            sspd1 = np.append(sspd1, np.mean(_s_cache))
+
+        sspd1 = np.append(sspd1, np.array([sspd1[-1]] * sw))
+
+        if max(abs(sspd1[1:] - sspd1[:-1])) > acc_thr:
+            print("..more speed smoothness needs to be applied on moving window")
+
+        return sspd1
+
+    sw = 5  # window size
+    # sspd1 = moving_window_spd_estimate(spd1, sw)
+
+    def low_pass_filter_spd_estimate(spd1, rt):
+        acc_thr = 7.5
+        spd = spd1[0]
+        sspd1 = spd
+        for _s in spd1:
+            spd = ratio * spd + (1 - ratio) * _s
+            sspd1 = np.append(sspd1, spd)
+        if max(abs(sspd1[1:] - sspd1[:-1])) > acc_thr:
+            print("..more speed smoothness needs to be applied on lp filter")
+
+        return sspd1
+
+    ratio = 0.05
+    sspd1 = low_pass_filter_spd_estimate(spd1, ratio)
+
+    slow_down1 = False
+    max_spd1 = max(sspd1)
+    min_spd1 = min(sspd1)
+    if (max_spd1 - min_spd1) > params["yielding_speed_threshold"]:
+        slow_down1 = True
+    else:
+        return []
+
+    projection_speed = max_spd1  # projected non-yielding motion for agent 1 (the yielder)
+    has_stop1 = False
+    if min_spd1 < params["stop_speed_criteria"]:
+        has_stop1 = True
+
+    tokens = []
+    other_agent_ids = [agent_i for agent_i in agent_trajectories.keys() if agent_i != target_agent_id]
+    for other_agent_id in other_agent_ids:
+        other_agent_traj = agent_trajectories[other_agent_id]
+        positions2, spd2, t2, sl2 = compute_trajectory_stats(other_agent_traj, yielding_dilation_radius)
+        intersection = sl1.intersection(sl2)
+        idxs1 = find_points_in_region(positions1, intersection)
+        idxs2 = find_points_in_region(positions2, intersection)
+        if (
+            len(idxs1) == 0 or len(idxs2) == 0
+        ):  # (sy.lo) -- once intersection is not null, is this check still necessary?
+            continue
+
+        # slowed_down_speed_threshold = 0.5
+        # too_slow1 = spd1[: idxs1[0]] < slowed_down_speed_threshold
+        # slow_before1 = np.cumprod(too_slow1[::-1])
+        # # This assumes delta-t's are smooth/constant
+        # dt1 = np.array([t1[1] - t1[0]] + list(t1[1:] - t1[:-1]))
+        # slow_before_dt1 = dt1[: idxs1[0]]
+        # waiting_period1 = np.sum(slow_before1 * slow_before_dt1)
+
+        # The trajectories upto the intersection.
+        positions1b = positions1[: idxs1[0], :]
+        positions2b = positions2[: idxs2[0], :]
+        if positions1b.shape[0] < 2 or positions2b.shape[0] < 2:
+            continue
+
+        # compute idx reference to begin forward-simulating for yielder non-yielding motion profile to check timing validity
+        idx_minspd1 = np.where(sspd1 == min(sspd1))[0][0]
+        idx_r1 = 0  # since beginning (assuming 2 agents involved only)
+        if (
+            idx_minspd1 >= idxs1[0]
+        ):  # if low speed profile begins after the merge, likely a spontaneously lane-change as slowing down at intersections # r1
+            continue
+
+        if has_stop1:
+            projection_speed = (
+                min_spd1 + sspd1[idxs1[0]]
+            ) / 2  # projected non-stopping yielding motion for agent1 (the yielder)
+            idx_r1 = np.where(sspd1 < params["yielding_speed_threshold"])[0][
+                0
+            ]  # since agent1 speed has ever fall below threshold
+
+        idx_r2 = idx_r1  # use same time idx; assuming t1 t2 clocks synced - to sanity CHECK
+
+        projected_pass_time2 = t2[idxs2[0]] - t2[idx_r2]
+        # dis = (positions1[idxs1[0], :] - positions1[idx_r1, :]) # distance estimate
+        _projected_pass_distance1 = math.sqrt(sum((positions1[idxs1[0], :] - positions1[idx_r1, :]) ** 2))
+
+        if idxs1[0] > (len(t1) - 1):  # merged too late
+            continue
+
+        _p_dt1 = t1[idx_r1 : idxs1[0]] - t1[idx_r1 + 1 : idxs1[0] + 1]
+        _projected_pass_distance1c = abs(sum(spd1[: len(_p_dt1)] * _p_dt1))
+
+        # sanity check required
+        if projected_pass_time2 < 0:
+            continue
+
+        projected_pass_time1 = _projected_pass_distance1c / projection_speed  # projected pass time
+        actual_pass_time1 = t1[idxs1[0]] - t1[idx_r1]  # real pass time
+
+        if projected_pass_time1 > actual_pass_time1:
+            # method sanity check for debugging: shouldn't be triggered
+            print("passing time estimate too conservative")
+            # print(
+            #    "if has stop? projected pass time estimates v.s. actual: {}, {}, {}".format(
+            #        has_stop1, projected_pass_time1, actual_pass_time1
+            #    )
+            # )
+            # print(
+            #    "min_spd v.s. intersection spd v.s. projection spd, idx_minspd1, idxs1[0] = {}, {}, {}, {}, {}".format(
+            #        sspd1[: idx_minspd1 + 1],
+            #        sspd1[idx_minspd1 + 1 : idxs1[0] + 1],
+            #        projection_speed,
+            #        idx_minspd1,
+            #        idxs1[0],
+            #    )
+            # )
+            continue
+
+        # projected_pass_time1 = min(projected_pass_time1, actual_pass_time1) #conservative fastest pass time estimate v.s. real pass time #r2
+
+        # if projected pass time difference is smaller than some threshold: non-conservative
+        if abs(projected_pass_time1 - projected_pass_time2) < params["projected_merge_time_threshold"]:
+            continue
+
+        sl1b = LineString(positions1b[:, :2]).buffer(yielding_dilation_radius)
+        sl2b = LineString(positions2b[:, :2]).buffer(yielding_dilation_radius)
+
+        # The regions that cross each other
+        sl1_only = (sl1b.difference(sl2)).buffer(-yielding_dilation_radius / 2.0)
+        sl2_only = (sl2b.difference(sl1)).buffer(-yielding_dilation_radius / 2.0)
+        # Skip if no overlaps in the trajectory.
+        # idx1_m1 = max(0, idxs1[0] - params["yielding_dt"])
+        if (
+            sl1_only.length
+            > params[
+                "yielding_prefix"
+            ]  # long enough prefix for trajectory 1 #(sy.lo) -- checking agent2 should be sufficient
+            and sl2_only.length > params["yielding_prefix"]  # long enough prefix for trajectory 2
+            # and t1[idxs1[0]] - t2[idxs2[0]] > params["yielding_time_gap"]  # agent 1 is before agent 2
+            and 0 < t1[idxs1[0]] - t2[idxs2[0]] < params["merge_time_threshold"]  # CLOSE-MERGE-TEST
+            # and spd1[idx1_m1] - spd1[idxs1[0]] > -0.5  # non-increasing speed. #(sy.lo) -- should the sign of > be flipped?
+            # and Point(positions2b[0, :]).distance(sl1_only)
+            # > params["yielding_initial_distance"]  # initial point for 2 is far from trajectory 1
+            # sy.lo: is this necessary if we have checked the prefix?
+        ):
+            new_token = create_duration_label("Conservative-Yield", t2[idxs2[0]], t2[idxs2[-1]], subject=other_agent_id)
+            tokens.append(new_token)
+
+    ## multi-agent check - only populate the closest merging agent
+    # tokens_ = []
+    # for _k in merge_time_idx1.keys():
+    #    _idx = np.where(np.array(merge_time_diff[_k]) == min(merge_time_diff[_k]))[0][0]
+    #    merge_idx = merge_time_idx1[_k][_idx]
+    #    tokens_.append(tokens[merge_idx])
+
+    return tokens
+
+
+def merge_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict, params: dict) -> list:
+    """If agent1 and agent2 start on different paths, end up in the same path, and agent2 gets first to the joint part of the path; compared to yield, with looser conditions on the distance maintained and the motion profile, and a parameter to contribute to close merge
+
+    Parameters
+    ----------
+    agent_trajectories: OrderedDict
+        Map from agent id to the trajectory of the agents. The first agent is the agent that may/may not yield.
+        The later agents are all the agent possibly yielded to.
+    scene_information: dict
+        Scene information, has map_elements->OrderedDict as a field.
+    params: dict
+        Parameters:
+        yielding_prefix - minimal threshold (meters) to verify that the trajectories are long enough
+        merge_time_threshold - the time threshold to filter the arrival timing difference between agent 1 and agent 2 at intersection point (small being close merge, large being regular merge)
+
+    Returns
+    -------
+    token_list: list
+        A list of tokens detected ("merge").
     """
     if len(list(agent_trajectories.values())) < 2:
         return []
@@ -858,6 +1156,8 @@ def yield_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict
     positions1, spd1, t1, sl1 = compute_trajectory_stats(target_agent_traj, yielding_dilation_radius)
 
     tokens = []
+    merge_time_idx1 = defaultdict(list)
+    merge_time_diff = defaultdict(list)
     other_agent_ids = [agent_i for agent_i in agent_trajectories.keys() if agent_i != target_agent_id]
     for other_agent_id in other_agent_ids:
         other_agent_traj = agent_trajectories[other_agent_id]
@@ -865,8 +1165,29 @@ def yield_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict
         intersection = sl1.intersection(sl2)
         idxs1 = find_points_in_region(positions1, intersection)
         idxs2 = find_points_in_region(positions2, intersection)
-        if len(idxs1) == 0 or len(idxs2) == 0:
+        if (
+            len(idxs1) == 0 or len(idxs2) == 0
+        ):  # (sy.lo) -- once intersection is not null, is this check still necessary?
             continue
+        if idxs1[0] < idxs2[0]:
+            # This means the agent1 is ahead of agent2
+            continue
+        # Agent1 is after the agent2
+
+        # compute idx reference to begin forward-simulating for yielder non-yielding motion profile to check timing validity
+        idx_minspd1 = np.where(spd1 == min(spd1))[0][0]
+        if (
+            idx_minspd1 >= idxs1[0]
+        ):  # if low speed profile begins after the merge, likely a spontaneously lane-change as slowing down at intersections # r1
+            continue
+
+        # slowed_down_speed_threshold = 0.5
+        # too_slow1 = spd1[: idxs1[0]] < slowed_down_speed_threshold
+        # slow_before1 = np.cumprod(too_slow1[::-1])
+        # # This assumes delta-t's are smooth/constant
+        # dt1 = np.array([t1[1] - t1[0]] + list(t1[1:] - t1[:-1]))
+        # slow_before_dt1 = dt1[: idxs1[0]]
+        # waiting_period1 = np.sum(slow_before1 * slow_before_dt1)
 
         # The trajectories upto the intersection.
         positions1b = positions1[: idxs1[0], :]
@@ -881,135 +1202,40 @@ def yield_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict
         sl1_only = (sl1b.difference(sl2)).buffer(-yielding_dilation_radius / 2.0)
         sl2_only = (sl2b.difference(sl1)).buffer(-yielding_dilation_radius / 2.0)
         # Skip if no overlaps in the trajectory.
-        if len(idxs1) == 0 or len(idxs2) == 0:
-            continue
-        idx1_m1 = max(0, idxs1[0] - params["yielding_dt"])
+        # idx1_m1 = max(0, idxs1[0] - params["yielding_dt"])
         if (
-            sl1_only.length > params["yielding_prefix"]  # long enough prefix for trajectory 1
+            sl1_only.length
+            > params[
+                "yielding_prefix"
+            ]  # long enough prefix for trajectory 1 #(sy.lo) -- checking agent2 should be sufficient
             and sl2_only.length > params["yielding_prefix"]  # long enough prefix for trajectory 2
-            and t1[idxs1[0]] - t2[idxs2[0]] > params["yielding_time_gap"]  # agent 1 is before agent 2
-            and spd1[idx1_m1] - spd1[idxs1[0]] > -0.5  # non-increasing speed.
+            # and t1[idxs1[0]] - t2[idxs2[0]] > params["yielding_time_gap"]  # agent 1 is before agent 2
+            and 0 < t1[idxs1[0]] - t2[idxs2[0]] < params["merge_time_threshold"]  # CLOSE-MERGE-TEST
+            # and spd1[idx1_m1] - spd1[idxs1[0]] > -0.5  # non-increasing speed. #(sy.lo) -- should the sign of > be flipped?
             and Point(positions2b[0, :]).distance(sl1_only)
             > params["yielding_initial_distance"]  # initial point for 2 is far from trajectory 1
-        ):
-            tokens.append(create_duration_label("Yield", t2[idxs2[0]], t2[idxs2[-1]], subject=other_agent_id))
-    return tokens
-
-
-def proximity_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict, params: dict) -> list:
-    """If agent1 is too close to another agent, return a token.
-
-    Parameters
-    ----------
-    agent_trajectories: OrderedDict
-        Map from agent id to the trajectory of the agents. The first agent is the agent that may/may not yield.
-        The later agents are all the agent possibly yielded to.
-    scene_information: dict
-        Scene information, has map_elements->OrderedDict as a field.
-    params: dict
-        Parameters:
-        proximity_threshold - maximal distance between agent1,agent2
-
-    Returns
-    -------
-    token_list: list
-        A list of tokens detected ("proximity").
-    """
-
-    if len(list(agent_trajectories.values())) < 2:
-        return []
-
-    target_agent_id = list(agent_trajectories.keys())[0]
-    target_agent_traj = agent_trajectories[target_agent_id]
-    proximity_threshold = params["proximity_threshold"]
-
-    # positions1, spd1, t1, sl1 = compute_trajectory_stats(target_agent_traj, yielding_dilation_radius)
-
-    tokens = []
-    other_agent_ids = [agent_i for agent_i in agent_trajectories.keys() if agent_i != target_agent_id]
-    for other_agent_id in other_agent_ids:
-        other_agent_traj = agent_trajectories[other_agent_id]
-        # Interpolate the other agent's positions to the same timepoints as the target agent
-        x_interp = interp1d(other_agent_traj[:, 2], other_agent_traj[:, 0], fill_value="extrapolate")
-        y_interp = interp1d(other_agent_traj[:, 2], other_agent_traj[:, 1], fill_value="extrapolate")
-        other_agent_traj_registered = np.transpose(
-            np.stack([x_interp(target_agent_traj[:, 2]), y_interp(target_agent_traj[:, 2])])
-        )
-        # Compute distance between the 2 agents.
-        agents_dist = np.sum((other_agent_traj_registered - target_agent_traj[:, :2]) ** 2, 1)
-        min_idx = np.argmin(agents_dist)
-        min_val = np.min(agents_dist)
-        if min_val < proximity_threshold**2:
-            tokens.append(
-                create_duration_label(
-                    "proximity",
-                    target_agent_traj[min_idx, 2],
-                    target_agent_traj[min_idx, 2],
-                    subject=other_agent_id,
-                )
+        ):  # is this necessary if we have checked the prefix?
+            time_diff = t1[idxs1[0]] - t2[idxs2[-1]]
+            aggressiveness_val = time_diff
+            new_token = create_duration_label(
+                "Merge",
+                t2[idxs2[-1]],
+                t1[idxs1[0]],
+                subject=other_agent_id,
+                value=aggressiveness_val,
+                leading_agent=other_agent_id,
+                following_agent=target_agent_id,
             )
-    return tokens
+            tokens.append(new_token)
+            merge_time_idx1[idxs1[0]].append(len(tokens) - 1)
+            merge_time_diff[idxs1[0]].append(t1[idxs1[0]] - t2[idxs2[0]])
 
+    # multi-agent check - only populate the closest merging agent
+    tokens_ = []
+    for _k in merge_time_idx1.keys():
+        _idx = np.where(np.array(merge_time_diff[_k]) == min(merge_time_diff[_k]))[0][0]
+        merge_idx = merge_time_idx1[_k][_idx]
+        tokens_.append(tokens[merge_idx])
 
-def ttc_filter(agent_trajectories: OrderedDict, scene_information: OrderedDict, params: dict) -> list:
-    """If the Time to Collision (TTC) is within the threshold, return a token
+    return tokens_
 
-    Parameters
-    ----------
-    agent_trajectories: OrderedDict
-        A map from agent_id to a Nx3 float array of positions over time, (x,y,t)
-    scene_information: dict
-        Scene information, has map_elements->OrderedDict as a field.
-    params: dict
-        Parameters:
-        ttc_threshold - Maximum number of seconds
-
-    Returns
-    -------
-    token_list: list
-        A list of tokens detected ("ttc").
-    """
-    if len(list(agent_trajectories.values())) < 2:
-        return []
-
-    ttc_threshold_squared = params["ttc_threshold"] ** 2
-
-    def compute_trajectory_stats(traj):
-        """Compute trajectory stats needed for yielding"""
-        positions = traj[:, :2]
-        velocities = positions[1:, :] - positions[:-1, :]
-        velocities = np.concatenate((velocities, velocities[-2:-1, :]), axis=0)
-        slopes = velocities[:, 1] / velocities[:, 0]
-        return positions, velocities, slopes
-
-    target_agent_id = list(agent_trajectories.keys())[0]
-    target_agent_traj = agent_trajectories[target_agent_id]
-    target_positions, target_velocities, target_slopes = compute_trajectory_stats(target_agent_traj)
-    target_time_points = target_agent_traj[:, 2]
-
-    tokens = []
-    other_agent_ids = [agent_i for agent_i in agent_trajectories.keys() if agent_i != target_agent_id]
-    for other_agent_id in other_agent_ids:
-        other_agent_traj = agent_trajectories[other_agent_id]
-        x_interp = interp1d(other_agent_traj[:, 2], other_agent_traj[:, 0], fill_value="extrapolate")
-        y_interp = interp1d(other_agent_traj[:, 2], other_agent_traj[:, 1], fill_value="extrapolate")
-        other_agent_traj_registered = np.transpose(
-            np.stack([x_interp(target_agent_traj[:, 2]), y_interp(target_agent_traj[:, 2])])
-        )
-
-        other_positions, other_velocities, other_slopes = compute_trajectory_stats(other_agent_traj_registered)
-
-        relative_distances_squared = ((target_positions - other_positions) ** 2).sum(axis=-1)
-        relative_velocities = target_velocities - other_velocities
-        relative_velocities_squared = (relative_velocities**2).sum(axis=-1)
-        ttc = relative_distances_squared / relative_velocities_squared
-        relevant_time_idxs = np.nonzero(ttc < ttc_threshold_squared)[0]
-        if len(relevant_time_idxs):
-            start_time = target_time_points[relevant_time_idxs[0]].item()
-            end_time = target_time_points[relevant_time_idxs[-1]].item()
-
-            tokens.append(
-                create_duration_label("TTC", start_time=start_time, end_time=end_time, subject=other_agent_id)
-            )
-
-    return tokens
