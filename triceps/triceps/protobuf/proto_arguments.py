@@ -564,6 +564,19 @@ def parse_arguments(
         default=0.2,
         help="Timestep size (i.e., sampling period) for the future. Need to update future-timesteps if changing this timestep size.",
     )
+    parser.add_argument(
+        "--past-timestep-starting-offset",
+        type=int,
+        default=0,
+        help="The number of frames to skip before the first frame of the past trajectory. Default: 0",
+    )
+
+    parser.add_argument(
+        "--future-timestep-starting-offset",
+        type=int,
+        default=0,
+        help="The number of frames to skip before the first frame of the future trajectory. Default: 0",
+    )
     parser.add_argument("--max-semantic-targets", type=int, default=30, help="Maximum number of semantic targets.")
     parser.add_argument("--max-language-tokens", type=int, default=50, help="Maximum number of language tokens.")
     parser.add_argument("--save-iteration-interval", type=int, default=5, help="Interval for saving the model.")
@@ -789,6 +802,13 @@ def parse_arguments(
             If set, the PA SOMAI component will perform its own detections rather than use the provided
             bounding boxes.
             """,
+    )
+
+    parser.add_argument(
+        "--plot-debug-normalization",
+        type=str2bool,
+        default=False,
+        help="Plot the raw map and un-normalized traj/map",
     )
     parser = semantic_mask_argument_setter(parser)
 
